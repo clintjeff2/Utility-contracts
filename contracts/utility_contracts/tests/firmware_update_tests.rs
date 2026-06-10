@@ -2,7 +2,9 @@
 
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{token, Address, BytesN, Env};
-use utility_contracts::{SignedUpdateComplete, SignedUsageData, UtilityContract, UtilityContractClient};
+use utility_contracts::{
+    SignedUpdateComplete, SignedUsageData, UtilityContract, UtilityContractClient,
+};
 
 fn setup_meter() -> (Env, Address, u64, BytesN<32>) {
     let env = Env::default();

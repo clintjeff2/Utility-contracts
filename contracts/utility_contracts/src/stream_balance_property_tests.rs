@@ -20,16 +20,15 @@
 ///   2. Edge cases (zero, max values, boundaries) are covered
 ///   3. Sequential operations maintain invariants
 ///   4. No combination of inputs violates the invariants
-
 extern crate std;
 
 use proptest::prelude::*;
 use std::cmp;
 use std::format;
-use std::vec;
 use std::println;
-use std::vec::Vec;
 use std::string::String;
+use std::vec;
+use std::vec::Vec;
 
 macro_rules! prop_assert_ge {
     ($left:expr, $right:expr $(,)?) => {
@@ -195,7 +194,7 @@ fn check_accumulated_balance_upper_bound(
         return Err(format!(
             "Accumulated balance {} exceeds initial deposit {}",
             accumulated_balance, initial_deposit
-        ))
+        ));
     }
     Ok(())
 }
@@ -219,9 +218,7 @@ fn calculate_fees(gross_streamed: i128, fee_bps: i128) -> i128 {
     }
 
     // fee_bps is in basis points, so divide by 10000
-    gross_streamed
-        .saturating_mul(fee_bps)
-        .saturating_div(10000)
+    gross_streamed.saturating_mul(fee_bps).saturating_div(10000)
 }
 
 /// Simulate a single streaming interval with fees
@@ -635,16 +632,12 @@ fn test_comprehensive_stream_lifecycle() {
     let withdrawal1 = remaining / 2;
     let balance_after_w1 = remaining.saturating_sub(withdrawal1);
 
-    assert!(
-        check_withdrawal_invariant(initial_deposit, withdrawal1, remaining).is_ok()
-    );
+    assert!(check_withdrawal_invariant(initial_deposit, withdrawal1, remaining).is_ok());
 
     let withdrawal2 = balance_after_w1 / 3;
     let final_balance = balance_after_w1.saturating_sub(withdrawal2);
 
-    assert!(
-        check_withdrawal_invariant(initial_deposit, withdrawal2, balance_after_w1).is_ok()
-    );
+    assert!(check_withdrawal_invariant(initial_deposit, withdrawal2, balance_after_w1).is_ok());
 
     // Final conservation check
     let total_withdrawn = withdrawal1.saturating_add(withdrawal2);
@@ -694,9 +687,7 @@ fn test_rate_acceleration_scenario() {
         assert_le!(total_streamed, initial_deposit);
     }
 
-    assert!(
-        check_balance_conservation(initial_deposit, total_streamed, balance, 0).is_ok()
-    );
+    assert!(check_balance_conservation(initial_deposit, total_streamed, balance, 0).is_ok());
 }
 
 #[test]

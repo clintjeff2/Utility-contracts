@@ -40,8 +40,8 @@
 //! This module implements Issue #261: Ledger-Native "Utility-Tariff" Price Oracle
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short,
-    Address, Env, Symbol, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    Env, Symbol, Vec,
 };
 
 use crate::{ContractError, DataKey};
@@ -102,11 +102,11 @@ fn validate_ed25519_signature(signature: &soroban_sdk::BytesN<64>) -> Result<(),
     if *signature == zero_sig {
         return Err(ContractError::InvalidSignature);
     }
-    
+
     // Additional validation could be added here:
     // - Check signature format
     // - Check for known weak signatures
-    
+
     Ok(())
 }
 
@@ -115,7 +115,7 @@ fn validate_ed25519_signature(signature: &soroban_sdk::BytesN<64>) -> Result<(),
 fn validate_sha256_hash(hash: &soroban_sdk::BytesN<32>) -> Result<(), ContractError> {
     // Basic length validation is already enforced by BytesN<32>
     // Additional validation could be added if needed
-    
+
     Ok(())
 }
 
@@ -148,25 +148,25 @@ pub struct TariffWindowTransition {
     /// This should correspond to the hour boundary where the new
     /// tariff rate becomes effective.
     pub hour: u32,
-    
+
     /// Previous rate per second being replaced.
     ///
     /// The rate that was active before this transition.
     /// Used for audit trail and rate change verification.
     pub old_rate_per_second: i128,
-    
+
     /// New rate per second being applied.
     ///
     /// The rate that becomes active after this transition.
     /// Calculated from the hourly tariff rate.
     pub new_rate_per_second: i128,
-    
+
     /// New tariff tier classification.
     ///
     /// Indicates the pricing tier (Off-Peak, Standard, Peak, Critical Peak)
     /// that applies to the new rate.
     pub tariff_tier: TariffTier,
-    
+
     /// When the transition was executed (Unix timestamp).
     ///
     /// Used to verify transitions occur at expected times
@@ -203,19 +203,19 @@ pub enum TariffTier {
     /// Typically applied during night hours (0-6, 22-23) when
     /// electricity demand is lowest and generation costs are minimal.
     OffPeak = 0,
-    
+
     /// Standard pricing tier (normal rate).
     ///
     /// Applied during normal daytime hours when demand is moderate.
     /// Represents the baseline electricity price.
     Standard = 1,
-    
+
     /// Peak pricing tier (higher rate).
     ///
     /// Applied during high-demand periods (7-10, 17-20) when
     /// electricity consumption peaks and generation costs increase.
     Peak = 2,
-    
+
     /// Critical peak pricing tier (emergency rate).
     ///
     /// Applied during extreme grid stress, supply shortages,
@@ -257,20 +257,20 @@ pub struct HourlyTariff {
     /// Must be a valid hour within the 24-hour day.
     /// Each hour can have different pricing based on demand patterns.
     pub hour: u32,
-    
+
     /// Rate in cents per kilowatt-hour (kWh).
     ///
     /// This is the consumer-facing price that will be charged
     /// for electricity consumption during this hour.
     /// Typical values range from 5 to 50 cents per kWh.
     pub rate_cents_per_kwh: i128,
-    
+
     /// Tariff tier classification for this hour.
     ///
     /// Determines the pricing category and helps with
     // consumer understanding and demand response programs.
     pub tier: TariffTier,
-    
+
     /// Whether this hour has high renewable energy availability.
     ///
     /// Renewable hours typically have lower rates to encourage
@@ -314,31 +314,31 @@ pub struct DailyTariffSchedule {
     /// The vector must contain exactly 24 entries, indexed by hour.
     /// Each entry defines the rate, tier, and renewable status for that hour.
     pub hourly_rates: Vec<HourlyTariff>,
-    
+
     /// Date this schedule applies to (YYYYMMDD format).
     ///
     /// Ensures the schedule is only applied to the correct day.
     /// Prevents accidental application of wrong date's rates.
     pub schedule_date: u32,
-    
+
     /// Grid administrator who authorized this schedule.
     ///
     /// The address of the authorized administrator who signed
     // this schedule. Used for audit and verification purposes.
     pub signed_by: Address,
-    
+
     /// When this schedule was created (Unix timestamp).
     ///
     /// Used for audit trail and to verify notice periods
     // were respected before activation.
     pub created_at: u64,
-    
+
     /// When this schedule becomes effective (Unix timestamp).
     ///
     /// Must be at least 24 hours after creation to respect
     // the consumer protection notice period.
     pub effective_at: u64,
-    
+
     /// Cryptographic signature of the grid administrator.
     ///
     /// Ed25519 signature proving the administrator authorized
@@ -381,37 +381,37 @@ pub struct TariffUpdateProposal {
     /// Incremental ID that allows tracking of specific proposals
     /// and prevents duplicate or replay attacks.
     pub proposal_id: u64,
-    
+
     /// New daily tariff schedule to be applied.
     ///
     /// Contains the complete 24-hour pricing schedule that will
     /// replace the current schedule upon execution.
     pub new_schedule: DailyTariffSchedule,
-    
+
     /// Grid administrator proposing this change.
     ///
     /// The authorized administrator who initiated this proposal.
     /// Used for audit and accountability purposes.
     pub proposed_by: Address,
-    
+
     /// When this proposal was created (Unix timestamp).
     ///
     /// Marks the start of the 24-hour notice period.
     /// Used to verify consumer protection requirements.
     pub created_at: u64,
-    
+
     /// When this proposal becomes executable (Unix timestamp).
     ///
     /// Must be exactly 24 hours after creation to respect
     /// the mandatory notice period for consumer protection.
     pub executable_at: u64,
-    
+
     /// Whether this proposal has been executed.
     ///
     /// Set to true when the tariff update is completed.
     /// Prevents re-execution of the same proposal.
     pub is_executed: bool,
-    
+
     /// Hash of the current active schedule being replaced.
     ///
     /// Cryptographic hash of the schedule this proposal replaces.
@@ -455,25 +455,25 @@ pub struct FlowCalculationResult {
     /// This is the sum of tokens calculated for each tariff window
     /// based on the duration and rate in each window.
     pub total_tokens: i128,
-    
+
     /// Total duration of the calculation period in seconds.
     ///
     /// The time span from start_timestamp to end_timestamp.
     /// Used to verify the calculation covers the expected period.
     pub duration_seconds: u64,
-    
+
     /// Weighted average rate per second across all windows.
     ///
     /// Calculated as total_tokens / duration_seconds.
     /// Represents the effective average rate for the entire period.
     pub weighted_rate_per_second: i128,
-    
+
     /// Whether the calculation spanned multiple tariff windows.
     ///
     /// True if the stream crossed hour boundaries with different rates.
     /// False if the entire period was within a single tariff window.
     pub spanned_multiple_windows: bool,
-    
+
     /// Number of different tariff windows crossed.
     ///
     /// Count of distinct hourly tariff windows included in the calculation.
@@ -541,11 +541,7 @@ impl TariffOracle {
     /// - Future changes require 24-hour notice period
     /// - Schedule is visible to all market participants
     /// - Historical rates are preserved for audit purposes
-    pub fn initialize(
-        env: Env,
-        grid_admin: Address,
-        initial_schedule: DailyTariffSchedule,
-    ) {
+    pub fn initialize(env: Env, grid_admin: Address, initial_schedule: DailyTariffSchedule) {
         // Check if already initialized
         if env.storage().persistent().has(&DataKey::TariffOracleAdmin) {
             panic!("Tariff oracle already initialized");
@@ -587,12 +583,12 @@ impl TariffOracle {
     }
 
     /// Submit new tariff schedule with 24-hour notice period
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `new_schedule` - New daily tariff schedule
     /// * `admin_signature` - Grid administrator's signature
-    /// 
+    ///
     /// # Errors
     /// * `ContractError::UnauthorizedAdmin` - if not grid admin
     /// * `ContractError::InvalidTariffSchedule` - if schedule is invalid
@@ -658,11 +654,11 @@ impl TariffOracle {
     }
 
     /// Execute a tariff update proposal (after notice period)
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `proposal_id` - ID of proposal to execute
-    /// 
+    ///
     /// # Errors
     /// * `ContractError::UnauthorizedAdmin` - if not grid admin
     /// * `ContractError::AdminExecutionWindowExpired` - if notice period not met
@@ -715,9 +711,7 @@ impl TariffOracle {
 
         // Mark proposal as executed
         proposal.is_executed = true;
-        env.storage()
-            .persistent()
-            .set(&proposal_key, &proposal);
+        env.storage().persistent().set(&proposal_key, &proposal);
 
         // Emit transition event
         env.events().publish(
@@ -727,30 +721,30 @@ impl TariffOracle {
     }
 
     /// Calculate flow rate for current time with Time-of-Use pricing
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `consumption_rate` - Device consumption rate
-    /// 
+    ///
     /// # Returns
     /// Current tokens per second based on tariff
     pub fn calculate_current_flow_rate(env: Env, consumption_rate: i128) -> i128 {
         let current_hour = Self::get_current_hour(&env);
         let tariff = Self::get_current_tariff(env.clone(), current_hour);
-        
+
         // Convert cents per kWh to tokens per second
         // rate_per_second = consumption_rate * tariff.rate_cents_per_kwh
         tariff.rate_cents_per_kwh.saturating_mul(consumption_rate)
     }
 
     /// Calculate flow for a time period that may span multiple tariff windows
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `start_timestamp` - Start time of the period
     /// * `end_timestamp` - End time of the period
     /// * `consumption_rate` - Constant consumption rate
-    /// 
+    ///
     /// # Returns
     /// Flow calculation result with blended rates
     pub fn calculate_flow_for_period(
@@ -772,7 +766,7 @@ impl TariffOracle {
         while current_time < end_timestamp {
             let current_hour = Self::timestamp_to_hour(current_time);
             let tariff = Self::get_current_tariff(env.clone(), current_hour);
-            
+
             // Calculate time until next hour boundary
             let next_hour_boundary = Self::next_hour_boundary(current_time);
             let period_end = if next_hour_boundary <= end_timestamp {
@@ -780,19 +774,21 @@ impl TariffOracle {
             } else {
                 end_timestamp
             };
-            
+
             let period_duration = period_end - current_time;
             let period_tokens = consumption_rate
                 .saturating_mul(tariff.rate_cents_per_kwh)
                 .saturating_mul(period_duration as i128);
-            
+
             total_tokens += period_tokens;
-            weighted_rate_sum += tariff.rate_cents_per_kwh.saturating_mul(period_duration as i128);
-            
+            weighted_rate_sum += tariff
+                .rate_cents_per_kwh
+                .saturating_mul(period_duration as i128);
+
             if period_end < end_timestamp {
                 windows_crossed += 1;
             }
-            
+
             current_time = period_end;
         }
 
@@ -812,16 +808,20 @@ impl TariffOracle {
     }
 
     /// Get current tariff for the given hour
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `hour` - Hour of day (0-23)
-    /// 
+    ///
     /// # Returns
     /// Hourly tariff for the specified hour
     pub fn get_current_tariff(env: Env, hour: u8) -> HourlyTariff {
         // Try to get from temporary storage first (today's schedule)
-        if let Some(schedule) = env.storage().temporary().get::<DataKey, DailyTariffSchedule>(&DataKey::TodayTariffSchedule) {
+        if let Some(schedule) = env
+            .storage()
+            .temporary()
+            .get::<DataKey, DailyTariffSchedule>(&DataKey::TodayTariffSchedule)
+        {
             return Self::get_tariff_from_schedule(&schedule, hour);
         }
 
@@ -836,10 +836,10 @@ impl TariffOracle {
     }
 
     /// Get current tariff schedule
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
-    /// 
+    ///
     /// # Returns
     /// Current daily tariff schedule
     pub fn get_current_schedule(env: Env) -> DailyTariffSchedule {
@@ -850,10 +850,10 @@ impl TariffOracle {
     }
 
     /// Check if tariff oracle is properly configured
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
-    /// 
+    ///
     /// # Returns
     /// `true` if oracle is configured, `false` otherwise
     pub fn is_configured(env: Env) -> bool {
@@ -861,10 +861,10 @@ impl TariffOracle {
     }
 
     /// Get grid administrator address
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
-    /// 
+    ///
     /// # Returns
     /// Grid administrator address
     pub fn get_grid_admin(env: Env) -> Address {
@@ -875,11 +875,11 @@ impl TariffOracle {
     }
 
     /// Get tariff update proposal
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `proposal_id` - Proposal ID
-    /// 
+    ///
     /// # Returns
     /// Tariff update proposal details
     pub fn get_tariff_proposal(env: Env, proposal_id: u64) -> TariffUpdateProposal {
@@ -903,7 +903,7 @@ impl TariffOracle {
             if tariff.hour != i as u8 {
                 panic!("Invalid tariff schedule: hour sequence mismatch");
             }
-            
+
             if tariff.rate_cents_per_kwh <= 0 {
                 panic!("Invalid tariff schedule: rates must be positive");
             }
@@ -920,7 +920,7 @@ impl TariffOracle {
         if hour >= HOURS_IN_DAY {
             panic!("Invalid hour");
         }
-        
+
         schedule.hourly_rates.get(hour as u32).unwrap().clone()
     }
 
@@ -947,15 +947,15 @@ impl TariffOracle {
         let env = Env::new();
         // HOURS_IN_DAY (24) items — size is known at compile time
         let mut hourly_rates = Vec::new(&env);
-        
+
         // Create a simple default schedule
         for hour in 0..HOURS_IN_DAY {
             let (rate_cents, tier) = match hour {
-                0..=6 | 22..=23 => (8, TariffTier::OffPeak),      // Night: off-peak
-                7..=10 | 17..=20 => (15, TariffTier::Peak),      // Morning/evening: peak
-                _ => (12, TariffTier::Standard),                  // Daytime: standard
+                0..=6 | 22..=23 => (8, TariffTier::OffPeak), // Night: off-peak
+                7..=10 | 17..=20 => (15, TariffTier::Peak),  // Morning/evening: peak
+                _ => (12, TariffTier::Standard),             // Daytime: standard
             };
-            
+
             hourly_rates.push_back(HourlyTariff {
                 hour,
                 rate_cents_per_kwh: rate_cents,

@@ -7,8 +7,8 @@ use soroban_sdk::{
     testutils::{Address as TestAddress, Ledger as TestLedger},
     Address, Env,
 };
-use std::vec;
 use std::format;
+use std::vec;
 
 #[cfg(test)]
 mod pause_resume_fuzz {
@@ -35,7 +35,7 @@ mod pause_resume_fuzz {
 
             // Pause
             client.pause_stream(&stream_id);
-            
+
             // Verify paused state
             let paused_flow = client.get_continuous_flow(&stream_id).unwrap();
             assert_eq!(paused_flow.status, StreamStatus::Paused);

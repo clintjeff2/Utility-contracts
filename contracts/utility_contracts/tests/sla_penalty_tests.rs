@@ -2,7 +2,10 @@
 // This test validates the math and state transitions for SLA penalties.
 
 #[derive(Clone, Debug, PartialEq)]
-enum BillingType { PrePaid, PostPaid }
+enum BillingType {
+    PrePaid,
+    PostPaid,
+}
 
 #[derive(Clone, Debug)]
 struct SLAConfig {
@@ -37,11 +40,13 @@ fn settle_claim_logic(meter: &mut Meter, now: u64) -> i128 {
             meter.sla_state.accumulated_downtime = 0;
             meter.sla_state.is_penalty_active = false;
         }
-        
+
         if meter.sla_state.accumulated_downtime >= config.threshold_seconds {
             meter.sla_state.is_penalty_active = true;
             // The penalty mathematics do not cause underflow panics
-            amount = amount.saturating_mul(config.penalty_multiplier_bps).saturating_div(10000);
+            amount = amount
+                .saturating_mul(config.penalty_multiplier_bps)
+                .saturating_div(10000);
         } else {
             meter.sla_state.is_penalty_active = false;
         }
@@ -62,7 +67,7 @@ mod tests {
             balance: 100000,
             rate_per_unit: 10,
             sla_config: Some(SLAConfig {
-                threshold_seconds: 3600, // 1 hour
+                threshold_seconds: 3600,      // 1 hour
                 penalty_multiplier_bps: 5000, // 50% discount
             }),
             sla_state: SLAState {
@@ -82,7 +87,7 @@ mod tests {
         // 2. Add downtime (2 hours) - above threshold
         meter.sla_state.accumulated_downtime = 7200;
         meter.sla_state.last_report_timestamp = 2000;
-        
+
         // Claim should be penalized
         let claim2 = settle_claim_logic(&mut meter, 3000);
         // 1000s * 10 = 10000. Penalized by 50% = 5000.

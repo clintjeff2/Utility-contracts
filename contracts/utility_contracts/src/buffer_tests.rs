@@ -2,12 +2,12 @@
 
 extern crate std;
 
+use crate::{
+    BufferDepletedEvent, BufferWarningEvent, ContinuousFlow, ContractError, StreamStatus,
+    UtilityContract, UtilityContractClient, BUFFER_DURATION_SECONDS, BUFFER_WARNING_THRESHOLD,
+};
 use soroban_sdk::testutils::{Address as TestAddress, Ledger as TestLedger};
 use soroban_sdk::{symbol_short, Address, Env, Symbol};
-use crate::{
-    BufferDepletedEvent, BufferWarningEvent, ContractError, ContinuousFlow, StreamStatus, 
-    UtilityContract, UtilityContractClient, BUFFER_DURATION_SECONDS, BUFFER_WARNING_THRESHOLD
-};
 
 #[test]
 fn test_buffer_creation_requirement() {
@@ -28,7 +28,13 @@ fn test_buffer_creation_requirement() {
     // Test 2: Stream creation should fail without proper authorization
     env.mock_auths(&[]);
     let result = std::panic::catch_unwind(|| {
-        client.create_continuous_stream(&stream_id, &flow_rate, &initial_balance, &provider, &payer);
+        client.create_continuous_stream(
+            &stream_id,
+            &flow_rate,
+            &initial_balance,
+            &provider,
+            &payer,
+        );
     });
     assert!(result.is_err());
 
@@ -37,7 +43,7 @@ fn test_buffer_creation_requirement() {
         (&provider, &Symbol::new(&env, "create_continuous_stream")),
         (&payer, &Symbol::new(&env, "create_continuous_stream")),
     ]);
-    
+
     client.create_continuous_stream(&stream_id, &flow_rate, &initial_balance, &provider, &payer);
 
     // Verify stream was created with correct buffer
@@ -77,16 +83,22 @@ fn test_buffer_depletion_logic() {
     let stream = client.get_continuous_flow(&stream_id).unwrap();
     let current_balance = client.get_continuous_balance(&stream_id).unwrap();
     let buffer_balance = client.get_buffer_balance(&stream_id).unwrap();
-    
+
     assert!(current_balance <= 0, "Main balance should be depleted");
-    assert!(buffer_balance < buffer_amount, "Buffer should be partially used");
+    assert!(
+        buffer_balance < buffer_amount,
+        "Buffer should be partially used"
+    );
 
     // Advance time further to trigger buffer warning
     let remaining_buffer_time = buffer_balance / flow_rate;
     if remaining_buffer_time <= BUFFER_WARNING_THRESHOLD {
         // Check if warning was sent (this would be verified through events in production)
         let updated_stream = client.get_continuous_flow(&stream_id).unwrap();
-        assert!(updated_stream.buffer_warning_sent, "Buffer warning should be sent");
+        assert!(
+            updated_stream.buffer_warning_sent,
+            "Buffer warning should be sent"
+        );
     }
 }
 
@@ -112,7 +124,8 @@ fn test_buffer_warning_event() {
 
     // Advance time to near buffer depletion
     let warning_time = buffer_amount / flow_rate - BUFFER_WARNING_THRESHOLD + 100;
-    env.ledger().set_timestamp(env.ledger().timestamp() + warning_time as u64);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + warning_time as u64);
 
     // Trigger flow calculation which should emit BufferWarning
     client.get_continuous_balance(&stream_id);
@@ -144,7 +157,8 @@ fn test_buffer_depletion_and_termination() {
 
     // Advance time beyond buffer depletion
     let total_depletion_time = (initial_balance + buffer_amount) / flow_rate + 100;
-    env.ledger().set_timestamp(env.ledger().timestamp() + total_depletion_time as u64);
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + total_depletion_time as u64);
 
     // Trigger flow calculation which should deplete buffer and terminate stream
     let final_balance = client.get_continuous_balance(&stream_id);
@@ -154,7 +168,11 @@ fn test_buffer_depletion_and_termination() {
     assert_eq!(final_buffer.unwrap(), 0, "Buffer should be zero");
 
     let stream = client.get_continuous_flow(&stream_id).unwrap();
-    assert_eq!(stream.status, StreamStatus::Depleted, "Stream should be depleted");
+    assert_eq!(
+        stream.status,
+        StreamStatus::Depleted,
+        "Stream should be depleted"
+    );
 }
 
 #[test]
@@ -181,7 +199,10 @@ fn test_amicable_closure_refund() {
     env.mock_auths(&[(&provider, &Symbol::new(&env, "close_stream_amicably"))]);
     let refunded_amount = client.close_stream_amicably(&stream_id);
 
-    assert_eq!(refunded_amount, buffer_amount, "Full buffer should be refunded");
+    assert_eq!(
+        refunded_amount, buffer_amount,
+        "Full buffer should be refunded"
+    );
 
     // Verify stream is marked as depleted
     let stream = client.get_continuous_flow(&stream_id).unwrap();
@@ -254,7 +275,10 @@ fn test_buffer_security_against_malicious_draining() {
     assert_eq!(withdrawn, 2000);
 
     let buffer_after_withdrawal = client.get_buffer_balance(&stream_id).unwrap();
-    assert_eq!(buffer_after_withdrawal, initial_buffer, "Buffer should be protected from withdrawals");
+    assert_eq!(
+        buffer_after_withdrawal, initial_buffer,
+        "Buffer should be protected from withdrawals"
+    );
 
     // Test 3: Unauthorized buffer addition should fail
     env.mock_auths(&[(&attacker, &Symbol::new(&env, "add_continuous_buffer"))]);
@@ -307,11 +331,20 @@ fn test_stream_creation_without_buffer_fails() {
 
     // Attempt to create stream without proper authorization for buffer transfer
     env.mock_auths(&[(&provider, &Symbol::new(&env, "create_continuous_stream"))]);
-    
+
     let result = std::panic::catch_unwind(|| {
-        client.create_continuous_stream(&stream_id, &flow_rate, &initial_balance, &provider, &payer);
+        client.create_continuous_stream(
+            &stream_id,
+            &flow_rate,
+            &initial_balance,
+            &provider,
+            &payer,
+        );
     });
-    assert!(result.is_err(), "Stream creation should fail without payer authorization for buffer");
+    assert!(
+        result.is_err(),
+        "Stream creation should fail without payer authorization for buffer"
+    );
 
     // Verify no stream was created
     assert!(client.get_continuous_flow(&stream_id).is_none());
@@ -337,9 +370,11 @@ fn test_buffer_refund_only_on_amicable_closure() {
     client.create_continuous_stream(&stream_id, &flow_rate, &initial_balance, &provider, &payer);
 
     // Let stream deplete naturally
-    let total_depletion_time = (initial_balance + (flow_rate * BUFFER_DURATION_SECONDS as i128)) / flow_rate + 100;
-    env.ledger().set_timestamp(env.ledger().timestamp() + total_depletion_time as u64);
-    
+    let total_depletion_time =
+        (initial_balance + (flow_rate * BUFFER_DURATION_SECONDS as i128)) / flow_rate + 100;
+    env.ledger()
+        .set_timestamp(env.ledger().timestamp() + total_depletion_time as u64);
+
     client.get_continuous_balance(&stream_id); // Trigger depletion
 
     // Attempt refund on depleted stream should fail

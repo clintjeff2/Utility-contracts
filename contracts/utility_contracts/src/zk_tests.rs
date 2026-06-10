@@ -1,6 +1,6 @@
 #![cfg(test)]
 use super::*;
-use soroban_sdk::{Env, Bytes, Vec, BytesN, testutils::Address as _};
+use soroban_sdk::{testutils::Address as _, Bytes, BytesN, Env, Vec};
 
 #[test]
 fn test_zk_privacy_flow() {
@@ -15,7 +15,15 @@ fn test_zk_privacy_flow() {
     let token_address = Address::generate(&env);
 
     let device_public_key = BytesN::from_array(&env, &[1u8; 32]);
-    let meter_id = client.register_meter(&user, &provider, &100, &token_address, &device_public_key, &0, &0);
+    let meter_id = client.register_meter(
+        &user,
+        &provider,
+        &100,
+        &token_address,
+        &device_public_key,
+        &0,
+        &0,
+    );
 
     // Enable privacy mode
     client.enable_privacy_mode(&meter_id);
@@ -62,7 +70,12 @@ fn test_zk_privacy_flow() {
     let result = env.try_invoke_contract::<(), ContractError>(
         &contract_id,
         &soroban_sdk::Symbol::new(&env, "submit_zk_usage_report"),
-        (meter_id, proof.clone(), public_inputs.clone(), nullifier.clone()),
+        (
+            meter_id,
+            proof.clone(),
+            public_inputs.clone(),
+            nullifier.clone(),
+        ),
     );
 
     assert!(result.is_err());
@@ -74,7 +87,7 @@ fn test_negate_g1() {
     let env = Env::default();
     let point = Bytes::from_slice(&env, &[1u8; 64]);
     let negated = negate_g1(&env, &point);
-    
+
     assert_eq!(negated.slice(0..32), point.slice(0..32)); // X should be same
     assert_ne!(negated.slice(32..64), point.slice(32..64)); // Y should be different
 }

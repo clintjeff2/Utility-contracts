@@ -45,7 +45,8 @@ impl GasCostEstimator {
         number_of_meters: u32,
         percentage_group_meters_bps: i128, // basis points (10000 = 100%)
     ) -> i128 {
-        let group_meters = ((number_of_meters as i128 * percentage_group_meters_bps) / 10000) as u32;
+        let group_meters =
+            ((number_of_meters as i128 * percentage_group_meters_bps) / 10000) as u32;
         let individual_meters = number_of_meters - group_meters;
 
         let group_cost = if group_meters > 0 {
@@ -70,9 +71,17 @@ impl GasCostEstimator {
         number_of_meters: u32,
         percentage_group_meters_bps: i128,
     ) -> LargeScaleCostEstimate {
-        let monthly_cost_stroops = Self::estimate_provider_monthly_cost(env, number_of_meters, percentage_group_meters_bps);
+        let monthly_cost_stroops = Self::estimate_provider_monthly_cost(
+            env,
+            number_of_meters,
+            percentage_group_meters_bps,
+        );
         let annual_cost_stroops = monthly_cost_stroops * 12;
-        let cost_per_meter_stroops = if number_of_meters > 0 { annual_cost_stroops / number_of_meters as i128 } else { 0 };
+        let cost_per_meter_stroops = if number_of_meters > 0 {
+            annual_cost_stroops / number_of_meters as i128
+        } else {
+            0
+        };
 
         // Convert to XLM (1 XLM = 10,000,000 stroops)
         let xlm_precision: i128 = 10_000_000;
@@ -94,7 +103,9 @@ impl GasCostEstimator {
 
     pub fn get_operation_cost(operation: &soroban_sdk::String) -> i128 {
         // Compare operation name by checking known byte patterns
-        if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "register_meter") {
+        if *operation
+            == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "register_meter")
+        {
             return Self::REGISTER_METER;
         }
         if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "top_up") {
@@ -103,19 +114,31 @@ impl GasCostEstimator {
         if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "claim") {
             return Self::CLAIM;
         }
-        if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "update_heartbeat") {
+        if *operation
+            == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "update_heartbeat")
+        {
             return Self::UPDATE_HEARTBEAT;
         }
-        if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "group_top_up") {
+        if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "group_top_up")
+        {
             return Self::GROUP_TOP_UP_PER_METER;
         }
-        if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "emergency_shutdown") {
+        if *operation
+            == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "emergency_shutdown")
+        {
             return Self::EMERGENCY_SHUTDOWN;
         }
-        if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "submit_zk_usage_report") {
+        if *operation
+            == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "submit_zk_usage_report")
+        {
             return Self::SUBMIT_ZK_REPORT;
         }
-        if *operation == soroban_sdk::String::from_str(&soroban_sdk::Env::default(), "set_zk_verification_key") {
+        if *operation
+            == soroban_sdk::String::from_str(
+                &soroban_sdk::Env::default(),
+                "set_zk_verification_key",
+            )
+        {
             return Self::SET_ZK_VK;
         }
         0
@@ -135,5 +158,4 @@ pub struct LargeScaleCostEstimate {
     pub group_billing_enabled: bool,
 }
 
-impl LargeScaleCostEstimate {
-}
+impl LargeScaleCostEstimate {}

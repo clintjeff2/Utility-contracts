@@ -54,7 +54,10 @@ fn test_micro_deduction_truncation_never_favors_attacker() {
                 let net = gross.saturating_sub(fee);
 
                 // AC-1a: fee is never negative
-                assert!(fee >= 0, "fee must be >= 0 (rate={rate}, elapsed={elapsed}, bps={fee_bps})");
+                assert!(
+                    fee >= 0,
+                    "fee must be >= 0 (rate={rate}, elapsed={elapsed}, bps={fee_bps})"
+                );
 
                 // AC-1b: net deduction never exceeds gross (no balance inflation)
                 assert!(
@@ -143,7 +146,10 @@ fn test_high_frequency_micro_stream_no_logic_faults() {
     }
 
     // AC-3c: stream is depleted after all balance is consumed
-    assert!(depleted, "stream should be depleted after all balance consumed");
+    assert!(
+        depleted,
+        "stream should be depleted after all balance consumed"
+    );
     assert_eq!(balance, 0, "final balance should be exactly 0");
 }
 
@@ -170,7 +176,10 @@ fn test_update_flow_with_1_stroop_rate() {
 
     // 50 seconds × 1 stroop/sec = 50 stroops deducted
     assert_eq!(deducted, 50, "should deduct exactly 50 stroops");
-    assert_eq!(flow.accumulated_balance, 50, "remaining balance should be 50");
+    assert_eq!(
+        flow.accumulated_balance, 50,
+        "remaining balance should be 50"
+    );
     assert_eq!(flow.status, StreamStatus::Active, "stream still active");
 
     // Advance another 50 seconds — stream should deplete
@@ -179,5 +188,9 @@ fn test_update_flow_with_1_stroop_rate() {
 
     assert_eq!(deducted2, 50, "should deduct remaining 50 stroops");
     assert_eq!(flow.accumulated_balance, 0, "balance should be 0");
-    assert_eq!(flow.status, StreamStatus::Depleted, "stream should be depleted");
+    assert_eq!(
+        flow.status,
+        StreamStatus::Depleted,
+        "stream should be depleted"
+    );
 }

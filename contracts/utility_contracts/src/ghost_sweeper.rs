@@ -1,9 +1,9 @@
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short,
-    Address, BytesN, Env, Symbol, Vec,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    BytesN, Env, Symbol, Vec,
 };
 
-use crate::{ContractError, DataKey, ContinuousFlow, StreamStatus};
+use crate::{ContinuousFlow, ContractError, DataKey, StreamStatus};
 
 /// Issue #262: Ledger Rent Sweeper for Depleted "Ghost" Devices
 /// Prunes abandoned streams after 90 days to reduce ledger footprint
@@ -108,22 +108,22 @@ pub struct GhostSweeper;
 #[contractimpl]
 impl GhostSweeper {
     /// Prune a single ghost stream that has been zero balance for over 90 days
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `stream_id` - ID of the stream to prune
     /// * `relayer` - Address of the relayer performing the cleanup
-    /// 
+    ///
     /// # Returns
     /// Gas bounty paid to the relayer
-    /// 
+    ///
     /// # Errors
     /// * `ContractError::MeterNotFound` - if stream doesn't exist
     /// * `ContractError::StreamNotEligibleForPruning` - if stream not eligible
     /// * `ContractError::StreamHasPendingBuffer` - if stream has pending buffer
     pub fn prune_ghost_stream(env: Env, stream_id: u64, relayer: Address) -> i128 {
         let current_time = env.ledger().timestamp();
-        
+
         // Get stream data
         let stream_key = DataKey::ContinuousFlow(stream_id);
         let stream: ContinuousFlow = env
@@ -151,23 +151,17 @@ impl GhostSweeper {
         let archive_hash = Self::create_stream_archive(&env, &stream, current_time);
 
         // Remove heavy stream metadata
-        env.storage()
-            .persistent()
-            .remove(&stream_key);
+        env.storage().persistent().remove(&stream_key);
 
         // Remove MAC address mapping
         if stream.device_mac_pubkey != BytesN::from_array(&[0u8; 32]) {
             let mac_key = DataKey::DeviceHash(stream.device_mac_pubkey.clone());
-            env.storage()
-                .persistent()
-                .remove(&mac_key);
+            env.storage().persistent().remove(&mac_key);
         }
 
         // Store lightweight archive hash
         let archive_key = DataKey::StreamArchive(stream_id);
-        env.storage()
-            .persistent()
-            .set(&archive_key, &archive_hash);
+        env.storage().persistent().set(&archive_key, &archive_hash);
 
         // Update global statistics
         Self::update_sweeper_statistics(&env, 1, storage_bytes, gas_bounty);
@@ -186,24 +180,26 @@ impl GhostSweeper {
             timestamp: current_time,
         };
 
-        env.events().publish(
-            (symbol_short!("GSPrune"),),
-            prune_event,
-        );
+        env.events()
+            .publish((symbol_short!("GSPrune"),), prune_event);
 
         gas_bounty
     }
 
     /// Batch prune multiple ghost streams
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `stream_ids` - Vector of stream IDs to prune
     /// * `relayer` - Address of the relayer performing the cleanup
-    /// 
+    ///
     /// # Returns
     /// Summary of the sweeping operation
-    pub fn batch_prune_ghost_streams(env: Env, stream_ids: Vec<u64>, relayer: Address) -> SweeperResult {
+    pub fn batch_prune_ghost_streams(
+        env: Env,
+        stream_ids: Vec<u64>,
+        relayer: Address,
+    ) -> SweeperResult {
         let start_time = env.ledger().timestamp();
         let mut streams_pruned = 0u32;
         let mut total_bytes_reclaimed = 0u64;
@@ -227,35 +223,37 @@ impl GhostSweeper {
         };
 
         // Emit batch operation event
-        env.events().publish(
-            (symbol_short!("BGSweep"),),
-            sweeper_result.clone(),
-        );
+        env.events()
+            .publish((symbol_short!("BGSweep"),), sweeper_result.clone());
 
         sweeper_result
     }
 
     /// Get list of ghost stream candidates
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `limit` - Maximum number of candidates to return
-    /// 
+    ///
     /// # Returns
     /// Vector of ghost stream candidates
     pub fn get_ghost_stream_candidates(env: Env, limit: u32) -> Vec<GhostStreamCandidate> {
         let mut candidates = Vec::new(&env);
         let current_time = env.ledger().timestamp();
-        
+
         // This is a simplified implementation
         // In production, you would iterate through all streams or use an index
         let stream_ids = Self::get_all_stream_ids(&env, limit);
-        
+
         for stream_id in stream_ids.iter() {
             let stream_key = DataKey::ContinuousFlow(stream_id);
-            if let Some(stream) = env.storage().persistent().get::<DataKey, ContinuousFlow>(&stream_key) {
+            if let Some(stream) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, ContinuousFlow>(&stream_key)
+            {
                 let eligibility = Self::check_pruning_eligibility(&env, &stream, current_time);
-                
+
                 if eligibility.is_eligible || eligibility.days_zero_balance > 30 {
                     let candidate = GhostStreamCandidate {
                         stream_id,
@@ -267,7 +265,7 @@ impl GhostSweeper {
                         estimated_storage_bytes: Self::estimate_stream_storage_size(&stream),
                         is_eligible_for_pruning: eligibility.is_eligible,
                     };
-                    
+
                     candidates.push_back(candidate);
                 }
             }
@@ -277,24 +275,21 @@ impl GhostSweeper {
     }
 
     /// Check if a stream is eligible for pruning
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `stream_id` - Stream ID to check
-    /// 
+    ///
     /// # Returns
     /// Ghost stream candidate if eligible, None otherwise
     pub fn check_stream_eligibility(env: Env, stream_id: u64) -> Option<GhostStreamCandidate> {
         let current_time = env.ledger().timestamp();
-        
+
         let stream_key = DataKey::ContinuousFlow(stream_id);
-        let stream: ContinuousFlow = env
-            .storage()
-            .persistent()
-            .get(&stream_key)?;
+        let stream: ContinuousFlow = env.storage().persistent().get(&stream_key)?;
 
         let eligibility = Self::check_pruning_eligibility(&env, &stream, current_time);
-        
+
         Some(GhostStreamCandidate {
             stream_id,
             device_mac: stream.device_mac_pubkey.clone(),
@@ -308,11 +303,11 @@ impl GhostSweeper {
     }
 
     /// Get stream archive information
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
     /// * `stream_id` - Stream ID
-    /// 
+    ///
     /// # Returns
     /// Stream archive if exists, None otherwise
     pub fn get_stream_archive(env: Env, stream_id: u64) -> Option<StreamArchive> {
@@ -322,10 +317,10 @@ impl GhostSweeper {
     }
 
     /// Get global sweeper statistics
-    /// 
+    ///
     /// # Arguments
     /// * `env` - The contract environment
-    /// 
+    ///
     /// # Returns
     /// Sweeper statistics
     pub fn get_sweeper_statistics(env: Env) -> SweeperStatistics {
@@ -384,7 +379,7 @@ impl GhostSweeper {
         } else {
             0
         };
-        
+
         base_size + mac_mapping_size + 100 // Add overhead for storage
     }
 
@@ -396,7 +391,11 @@ impl GhostSweeper {
     }
 
     /// Create stream archive for historical integrity
-    fn create_stream_archive(env: &Env, stream: &ContinuousFlow, current_time: u64) -> StreamArchive {
+    fn create_stream_archive(
+        env: &Env,
+        stream: &ContinuousFlow,
+        current_time: u64,
+    ) -> StreamArchive {
         // Create hash of all stream data
         let data_hash = env.crypto().sha256(&stream);
 
@@ -415,15 +414,20 @@ impl GhostSweeper {
     }
 
     /// Update global sweeper statistics
-    fn update_sweeper_statistics(env: &Env, streams_pruned: u32, bytes_reclaimed: u64, gas_bounty: i128) {
+    fn update_sweeper_statistics(
+        env: &Env,
+        streams_pruned: u32,
+        bytes_reclaimed: u64,
+        gas_bounty: i128,
+    ) {
         let mut stats = Self::get_sweeper_statistics(env.clone());
-        
+
         stats.total_streams_pruned += streams_pruned;
         stats.total_bytes_reclaimed += bytes_reclaimed;
         stats.total_gas_bounty_paid += gas_bounty;
         stats.last_sweep_timestamp = env.ledger().timestamp();
         stats.total_sweep_operations += 1;
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::SweeperStatistics, &stats);
@@ -433,13 +437,13 @@ impl GhostSweeper {
     fn get_all_stream_ids(env: &Env, limit: u32) -> Vec<u64> {
         // Size is exactly `limit` — known before the loop begins
         let mut stream_ids = Vec::new(env);
-        
+
         // This is a placeholder - in production, you would have an index
         // For now, return some test stream IDs
         for i in 1..=limit {
             stream_ids.push_back(i as u64);
         }
-        
+
         stream_ids
     }
 }

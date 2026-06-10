@@ -1,9 +1,9 @@
+use soroban_sdk::testutils::{Address as _, Events, Ledger};
+use soroban_sdk::{symbol_short, token, Address, BytesN, Env, Symbol};
 use utility_contracts::{
-    BillingType, Meter, SignedUsageData, StreamStatus, UtilityContract,
-    UtilityContractClient, SLAState,
+    BillingType, Meter, SLAState, SignedUsageData, StreamStatus, UtilityContract,
+    UtilityContractClient,
 };
-use soroban_sdk::testutils::{Address as _, Ledger, Events};
-use soroban_sdk::{token, Address, BytesN, Env, symbol_short, Symbol};
 
 // Helper to create a 32-byte key
 fn device_key(env: &Env, byte: u8) -> BytesN<32> {
@@ -16,9 +16,15 @@ mod mock_oracle {
     pub struct MockOracle;
     #[contractimpl]
     impl MockOracle {
-        pub fn xlm_to_usd_cents(_env: Env, amount: i128) -> i128 { amount }
-        pub fn usd_cents_to_xlm(_env: Env, amount: i128) -> i128 { amount }
-        pub fn get_price(_env: Env) -> i128 { 100 }
+        pub fn xlm_to_usd_cents(_env: Env, amount: i128) -> i128 {
+            amount
+        }
+        pub fn usd_cents_to_xlm(_env: Env, amount: i128) -> i128 {
+            amount
+        }
+        pub fn get_price(_env: Env) -> i128 {
+            100
+        }
     }
 }
 
@@ -40,7 +46,9 @@ fn test_final_e2e_integration_hardware_to_dex() {
     let token_admin = Address::generate(&env);
 
     // 3. Setup Assets
-    let token_address = env.register_stellar_asset_contract_v2(token_admin.clone()).address();
+    let token_address = env
+        .register_stellar_asset_contract_v2(token_admin.clone())
+        .address();
     let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
     let token_client = token::Client::new(&env, &token_address);
 
@@ -49,8 +57,15 @@ fn test_final_e2e_integration_hardware_to_dex() {
     // 4. Register and Activate Meter
     let device_public_key = device_key(&env, 42);
     let off_peak_rate = 100;
-    
-    let meter_id = client.register_meter(&user, &provider, &off_peak_rate, &token_address, &device_public_key, &1);
+
+    let meter_id = client.register_meter(
+        &user,
+        &provider,
+        &off_peak_rate,
+        &token_address,
+        &device_public_key,
+        &1,
+    );
     client.initiate_pairing(&meter_id);
     client.complete_pairing(&meter_id, &BytesN::from_array(&env, &[1u8; 64]));
 
@@ -83,12 +98,18 @@ fn test_final_e2e_integration_hardware_to_dex() {
     // 7. Continuous Flow: Stream to external vault
     let stream_id = 212;
     let flow_rate = 1_000;
-    let stream_initial_balance = 5_000_000; 
+    let stream_initial_balance = 5_000_000;
 
     // Mint more to provider for stream funding
     token_admin_client.mint(&provider, &stream_initial_balance);
 
-    client.create_continuous_stream(&stream_id, &flow_rate, &stream_initial_balance, &provider, &provider);
+    client.create_continuous_stream(
+        &stream_id,
+        &flow_rate,
+        &stream_initial_balance,
+        &provider,
+        &provider,
+    );
 
     // Advance time
     env.ledger().set_timestamp(now + 3600);
@@ -104,8 +125,11 @@ fn test_final_e2e_integration_hardware_to_dex() {
 
     // 10. Final State Validation
     let final_meter = client.get_meter(&meter_id).unwrap();
-    assert_eq!(final_meter.balance, top_up_amount - (units_consumed * off_peak_rate) - earnings_to_withdraw);
-    
+    assert_eq!(
+        final_meter.balance,
+        top_up_amount - (units_consumed * off_peak_rate) - earnings_to_withdraw
+    );
+
     let final_flow = client.get_continuous_flow(&stream_id).unwrap();
     assert_eq!(final_flow.status, StreamStatus::Active);
 

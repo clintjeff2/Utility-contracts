@@ -1,7 +1,7 @@
 //! Issues #248–#251: fleet caps, P2P energy exchange, liveness/slashing, priority grid shed.
 //! Helpers use `persistent` storage for fleet totals and `temporary` for heartbeat TTL data.
 
-use crate::{panic_with_error, symbol_short, ContractError, ContinuousFlow, DataKey};
+use crate::{panic_with_error, symbol_short, ContinuousFlow, ContractError, DataKey};
 use soroban_sdk::{contracttype, token, Address, Bytes, BytesN, Env};
 
 // --- Issue #248: Fleet cap ---
@@ -123,11 +123,7 @@ pub enum P2PRole {
 }
 
 /// Fixed-point friendly net over `delta_seconds`: supply_rate and demand_rate are tokens/sec (same unit as streams).
-pub fn p2p_net_flow_amount(
-    supply_rate: i128,
-    demand_rate: i128,
-    delta_seconds: i128,
-) -> i128 {
+pub fn p2p_net_flow_amount(supply_rate: i128, demand_rate: i128, delta_seconds: i128) -> i128 {
     let net_rate = supply_rate.saturating_sub(demand_rate);
     net_rate.saturating_mul(delta_seconds)
 }
@@ -164,11 +160,7 @@ pub fn p2p_finalize_exchange(
     };
     let mut credit_delta = gross.saturating_sub(grid_fee);
     let vault_key = DataKey::P2PCreditVault(supplier.clone());
-    let mut vault_balance: i128 = env
-        .storage()
-        .instance()
-        .get(&vault_key)
-        .unwrap_or(0);
+    let mut vault_balance: i128 = env.storage().instance().get(&vault_key).unwrap_or(0);
 
     if credit_delta > 0 {
         // Supplier surplus: cap vault to prevent inflation when battery full.
@@ -346,7 +338,12 @@ pub fn provider_grid_state(env: &Env, provider: &Address) -> ProviderGridEpoch {
         })
 }
 
-pub fn global_load_shed(env: &Env, provider: Address, minimum_surviving_tier: PriorityTier, grid_admin: Address) {
+pub fn global_load_shed(
+    env: &Env,
+    provider: Address,
+    minimum_surviving_tier: PriorityTier,
+    grid_admin: Address,
+) {
     grid_admin.require_auth();
     let admin = env
         .storage()

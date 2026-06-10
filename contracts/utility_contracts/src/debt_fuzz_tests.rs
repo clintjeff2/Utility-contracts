@@ -47,7 +47,7 @@ mod debt_fuzz_tests {
             units_consumed: 10_000_000i128,           // 10 million units
             signature: BytesN::from_array(&env, &[3u8; 64]),
             public_key: device_public_key.clone(),
-                is_renewable_energy: false,
+            is_renewable_energy: false,
         };
 
         // This should not panic even with extreme values
@@ -89,7 +89,7 @@ mod debt_fuzz_tests {
             units_consumed: i128::MAX / 1_000_000_000,  // Safe maximum
             signature: BytesN::from_array(&env, &[4u8; 64]),
             public_key: device_public_key.clone(),
-                is_renewable_energy: false,
+            is_renewable_energy: false,
         };
 
         // Should handle maximum values without panicking
@@ -143,7 +143,7 @@ mod debt_fuzz_tests {
             units_consumed: 100_000i128,
             signature: BytesN::from_array(&env, &[3u8; 64]),
             public_key: device_public_key.clone(),
-                is_renewable_energy: false,
+            is_renewable_energy: false,
         };
 
         // This should not panic, even with zero balance

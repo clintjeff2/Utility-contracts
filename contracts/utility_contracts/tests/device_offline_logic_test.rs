@@ -2,7 +2,10 @@
 // This test validates the math and state transitions for the new offline features.
 
 #[derive(Clone, Debug, PartialEq)]
-enum BillingType { PrePaid, PostPaid }
+enum BillingType {
+    PrePaid,
+    PostPaid,
+}
 
 #[derive(Clone, Debug)]
 struct UsageData {
@@ -41,7 +44,10 @@ fn calculate_historical_average(usage_data: &UsageData, now: u64) -> i128 {
     if elapsed == 0 {
         return 0;
     }
-    usage_data.total_watt_hours.saturating_mul(usage_data.precision_factor).saturating_div(elapsed as i128)
+    usage_data
+        .total_watt_hours
+        .saturating_mul(usage_data.precision_factor)
+        .saturating_div(elapsed as i128)
 }
 
 fn get_effective_rate(meter: &Meter, _now: u64) -> i128 {
@@ -64,10 +70,12 @@ fn settle_claim_logic(meter: &mut Meter, now: u64) -> i128 {
             // Estimate consumption based on historical averages
             let avg_units_per_second = calculate_historical_average(&meter.usage_data, now);
             let effective_rate = get_effective_rate(meter, now);
-            
-            let estimated_units = avg_units_per_second.saturating_mul(elapsed as i128).saturating_div(meter.usage_data.precision_factor);
+
+            let estimated_units = avg_units_per_second
+                .saturating_mul(elapsed as i128)
+                .saturating_div(meter.usage_data.precision_factor);
             amount = estimated_units.saturating_mul(effective_rate);
-            
+
             // Track estimated total for later reconciliation
             meter.estimated_usage_total = meter.estimated_usage_total.saturating_add(amount);
         } else {
@@ -80,7 +88,8 @@ fn settle_claim_logic(meter: &mut Meter, now: u64) -> i128 {
         amount = (elapsed as i128).saturating_mul(meter.rate_per_unit);
     }
 
-    if meter.milestone_deadline > 0 && now > meter.milestone_deadline && !meter.milestone_confirmed {
+    if meter.milestone_deadline > 0 && now > meter.milestone_deadline && !meter.milestone_confirmed
+    {
         amount /= 2;
     }
 
@@ -105,7 +114,7 @@ fn deduct_units_logic(meter: &mut Meter, now: u64, units_consumed: i128) -> i128
         let estimated_cost = meter.estimated_usage_total;
         // Adjust balance: add back the estimate and let normal deduction handle actual
         meter.balance = meter.balance.saturating_add(estimated_cost);
-        
+
         meter.is_offline = false;
         meter.estimated_usage_total = 0;
         meter.grace_period_start = 0;
@@ -125,7 +134,7 @@ fn test_offline_grace_period_and_reconciliation() {
         debt: 0,
         billing_type: BillingType::PrePaid,
         rate_per_unit: 10, // nominal 10 per sec
-        off_peak_rate: 1, // 1 per watt-hour
+        off_peak_rate: 1,  // 1 per watt-hour
         peak_rate: 2,
         last_update: 1000,
         last_heartbeat: 1000,
@@ -153,7 +162,7 @@ fn test_offline_grace_period_and_reconciliation() {
     // 2. Device goes offline at T=1100.
     // Next claim at T=1500 (elapsed 400s). Heartbeat was 1100. Diff = 400 > 300.
     let claim2 = settle_claim_logic(&mut meter, 1500);
-    // Historical avg = 5000 / 1500 = 3.33 units/s? 
+    // Historical avg = 5000 / 1500 = 3.33 units/s?
     // Wait, first_reading is 0, so elapsed is 1500.
     // 5000 * 1000 / 1500 = 3333 (precision 1000) = 3.333 WH/s
     // Estimated units = 3333 * 400 / 1000 = 1333 WH.
@@ -172,7 +181,7 @@ fn test_offline_grace_period_and_reconciliation() {
     assert!(!meter.is_offline);
     assert_eq!(meter.estimated_usage_total, 0);
 
-    // 4. Grace period expiry test. 
+    // 4. Grace period expiry test.
     // Go offline at T=1600.
     // Claim at T=6000 (elapsed 4400s). Heartbeat was 1600. Diff = 4400 > 300.
     // Grace period starts at T=1600. 6000 - 1600 = 4400 > 3600 (GRACE_PERIOD_SECONDS).

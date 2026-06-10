@@ -45,7 +45,13 @@ fn test_invariant_zero_fee_full_depletion() {
     let remaining = deposited.saturating_sub(streamed).max(0);
     let fees: i128 = 0;
 
-    assert_streaming_invariant(deposited, streamed, remaining, fees, "zero-fee full depletion");
+    assert_streaming_invariant(
+        deposited,
+        streamed,
+        remaining,
+        fees,
+        "zero-fee full depletion",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +70,13 @@ fn test_invariant_with_fee_partial_stream() {
     let remaining = deposited.saturating_sub(net_streamed).max(0);
 
     // Invariant: deposited == net_streamed + remaining + fees
-    assert_streaming_invariant(deposited, net_streamed, remaining, fees, "with-fee partial stream");
+    assert_streaming_invariant(
+        deposited,
+        net_streamed,
+        remaining,
+        fees,
+        "with-fee partial stream",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -81,14 +93,62 @@ fn test_invariant_edge_cases() {
     }
 
     let cases = [
-        Case { deposited: 0, rate: 1, elapsed: 100, fee_bps: 0, label: "zero deposit" },
-        Case { deposited: 1, rate: 1, elapsed: 1, fee_bps: 0, label: "1-stroop deposit, 1-stroop rate" },
-        Case { deposited: i128::MAX / 2, rate: 1, elapsed: 1, fee_bps: 0, label: "max/2 deposit" },
-        Case { deposited: 1_000_000, rate: 1, elapsed: 0, fee_bps: 100, label: "zero elapsed" },
-        Case { deposited: 1_000_000, rate: 1_000_000, elapsed: 1, fee_bps: 1000, label: "max fee bps" },
-        Case { deposited: 1_000_000, rate: 1, elapsed: 2_000_000, fee_bps: 50, label: "over-depletion" },
-        Case { deposited: 100, rate: 3, elapsed: 33, fee_bps: 1, label: "non-divisible amounts" },
-        Case { deposited: 100, rate: 7, elapsed: 14, fee_bps: 3, label: "7-stroop rate" },
+        Case {
+            deposited: 0,
+            rate: 1,
+            elapsed: 100,
+            fee_bps: 0,
+            label: "zero deposit",
+        },
+        Case {
+            deposited: 1,
+            rate: 1,
+            elapsed: 1,
+            fee_bps: 0,
+            label: "1-stroop deposit, 1-stroop rate",
+        },
+        Case {
+            deposited: i128::MAX / 2,
+            rate: 1,
+            elapsed: 1,
+            fee_bps: 0,
+            label: "max/2 deposit",
+        },
+        Case {
+            deposited: 1_000_000,
+            rate: 1,
+            elapsed: 0,
+            fee_bps: 100,
+            label: "zero elapsed",
+        },
+        Case {
+            deposited: 1_000_000,
+            rate: 1_000_000,
+            elapsed: 1,
+            fee_bps: 1000,
+            label: "max fee bps",
+        },
+        Case {
+            deposited: 1_000_000,
+            rate: 1,
+            elapsed: 2_000_000,
+            fee_bps: 50,
+            label: "over-depletion",
+        },
+        Case {
+            deposited: 100,
+            rate: 3,
+            elapsed: 33,
+            fee_bps: 1,
+            label: "non-divisible amounts",
+        },
+        Case {
+            deposited: 100,
+            rate: 7,
+            elapsed: 14,
+            fee_bps: 3,
+            label: "7-stroop rate",
+        },
     ];
 
     for c in &cases {
@@ -103,7 +163,8 @@ fn test_invariant_edge_cases() {
         // Clamp: can't stream more than deposited
         let actual_net_streamed = net_streamed.min(c.deposited);
         let actual_fees = fees.min(c.deposited.saturating_sub(actual_net_streamed));
-        let remaining = c.deposited
+        let remaining = c
+            .deposited
             .saturating_sub(actual_net_streamed)
             .saturating_sub(actual_fees)
             .max(0);
@@ -199,9 +260,7 @@ fn test_contract_level_streaming_invariant() {
     let fees = client.get_accrued_streaming_fees(&stream_id);
 
     // streamed = deposited - remaining - fees
-    let streamed = deposited
-        .saturating_sub(remaining)
-        .saturating_sub(fees);
+    let streamed = deposited.saturating_sub(remaining).saturating_sub(fees);
 
     assert_streaming_invariant(deposited, streamed, remaining, fees, "contract-level 50s");
 
@@ -210,11 +269,15 @@ fn test_contract_level_streaming_invariant() {
     let flow2 = client.get_continuous_flow(&stream_id).unwrap();
     let remaining2 = flow2.accumulated_balance;
     let fees2 = client.get_accrued_streaming_fees(&stream_id);
-    let streamed2 = deposited
-        .saturating_sub(remaining2)
-        .saturating_sub(fees2);
+    let streamed2 = deposited.saturating_sub(remaining2).saturating_sub(fees2);
 
-    assert_streaming_invariant(deposited, streamed2, remaining2, fees2, "contract-level 100s");
+    assert_streaming_invariant(
+        deposited,
+        streamed2,
+        remaining2,
+        fees2,
+        "contract-level 100s",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -249,11 +312,15 @@ fn test_contract_level_invariant_with_fee() {
     let flow = client.get_continuous_flow(&stream_id).unwrap();
     let remaining = flow.accumulated_balance;
     let fees = client.get_accrued_streaming_fees(&stream_id);
-    let streamed = deposited
-        .saturating_sub(remaining)
-        .saturating_sub(fees);
+    let streamed = deposited.saturating_sub(remaining).saturating_sub(fees);
 
-    assert_streaming_invariant(deposited, streamed, remaining, fees, "with-fee contract-level");
+    assert_streaming_invariant(
+        deposited,
+        streamed,
+        remaining,
+        fees,
+        "with-fee contract-level",
+    );
 
     // Fees must be positive when fee_bps > 0 and time has elapsed
     assert!(fees > 0, "fees should be positive with non-zero fee_bps");

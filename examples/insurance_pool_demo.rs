@@ -13,6 +13,7 @@ struct InsurancePool {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct PoolMember {
     user_id: String,
     premium_paid: i128,
@@ -22,6 +23,7 @@ struct PoolMember {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct Claim {
     claim_id: u64,
     claimant: String,
@@ -31,6 +33,7 @@ struct Claim {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct Proposal {
     proposal_id: u64,
     proposer: String,

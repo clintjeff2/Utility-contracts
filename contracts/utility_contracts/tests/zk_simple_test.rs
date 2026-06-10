@@ -2,7 +2,7 @@
 
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{token, Address, Bytes, BytesN, Env, Vec};
-use utility_contracts::{UtilityContractClient, PrivateBillingStatus};
+use utility_contracts::{PrivateBillingStatus, UtilityContractClient};
 
 // Simple test to verify ZK privacy implementation compiles and works
 #[test]
@@ -16,18 +16,18 @@ fn test_zk_privacy_basic() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     let device_public_key = BytesN::from_array(&env, &[1u8; 32]);
-    
+
     // Register a meter first
     let meter_id = client.register_meter(&user, &provider, &10, &token, &device_public_key);
-    
+
     // Enable privacy mode
     client.enable_privacy_mode(&meter_id);
-    
+
     // Verify privacy is enabled
     assert!(client.is_privacy_enabled(&meter_id));
-    
+
     // Check private billing status
     let status = client.get_private_billing_status(&meter_id);
     assert_eq!(status.meter_id, meter_id);
@@ -35,13 +35,13 @@ fn test_zk_privacy_basic() {
     assert_eq!(status.total_commitments, 0);
     assert_eq!(status.verified_proofs, 0);
     assert!(status.privacy_enabled);
-    
+
     // Disable privacy mode
     client.disable_privacy_mode(&meter_id);
-    
+
     // Verify privacy is disabled
     assert!(!client.is_privacy_enabled(&meter_id));
-    
+
     println!("✅ ZK privacy basic functionality test passed!");
 }
 
@@ -56,12 +56,12 @@ fn test_zk_privacy_without_enabling() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     let device_public_key = BytesN::from_array(&env, &[1u8; 32]);
-    
+
     // Register a meter first
     let meter_id = client.register_meter(&user, &provider, &10, &token, &device_public_key);
-    
+
     // Try to submit ZK report without enabling privacy - should fail
     let commitment = BytesN::from_array(&env, &[1u8; 32]);
     let nullifier = BytesN::from_array(&env, &[2u8; 32]);
@@ -73,9 +73,9 @@ fn test_zk_privacy_without_enabling() {
         &soroban_sdk::Symbol::new(&env, "submit_zk_usage_report"),
         (meter_id, commitment, nullifier, encrypted_usage, proof_hash),
     );
-    
+
     // Should fail with PrivacyNotEnabled error
     assert!(result.is_err());
-    
+
     println!("✅ ZK privacy error handling test passed!");
 }

@@ -3,9 +3,9 @@
 extern crate std;
 
 use crate::*;
-use soroban_sdk::{symbol_short, Address, Env, BytesN};
-use std::vec;
+use soroban_sdk::{symbol_short, Address, BytesN, Env};
 use std::format;
+use std::vec;
 
 #[test]
 fn test_dust_detection() {
@@ -27,7 +27,7 @@ fn test_dust_aggregation() {
     let client = UtilityContractClient::new(&env, &contract_id);
 
     let token_address = Address::generate(&env);
-    
+
     // Create initial aggregation
     let aggregation = get_or_create_dust_aggregation(&env, &token_address);
     assert_eq!(aggregation.total_dust, 0);
@@ -35,7 +35,7 @@ fn test_dust_aggregation() {
 
     // Update aggregation
     update_dust_aggregation(&env, &token_address, 5, 3);
-    
+
     let updated = get_or_create_dust_aggregation(&env, &token_address);
     assert_eq!(updated.total_dust, 5);
     assert_eq!(updated.stream_count, 3);
@@ -48,12 +48,14 @@ fn test_admin_setup() {
     let client = UtilityContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
-    
+
     // Set admin
     client.set_admin(&admin);
-    
+
     // Verify admin is set
-    let stored_admin = env.storage().instance()
+    let stored_admin = env
+        .storage()
+        .instance()
         .get::<DataKey, Address>(&DataKey::AdminAddress)
         .unwrap();
     assert_eq!(stored_admin, admin);
@@ -73,7 +75,9 @@ fn test_gas_bounty_funding() {
     client.fund_gas_bounty(&bounty_amount);
 
     // Check bounty pool
-    let bounty_pool = env.storage().instance()
+    let bounty_pool = env
+        .storage()
+        .instance()
         .get::<DataKey, i128>(&DataKey::GasBountyPool)
         .unwrap();
     assert_eq!(bounty_pool, bounty_amount);
@@ -108,7 +112,9 @@ fn test_dust_sweeping_single_stream() {
         status: StreamStatus::Depleted,
         reserved: [0u8; 7],
     };
-    env.storage().instance().set(&DataKey::ContinuousFlow(stream_id), &flow);
+    env.storage()
+        .instance()
+        .set(&DataKey::ContinuousFlow(stream_id), &flow);
 
     // Test dust detection
     assert!(client.has_dust(&stream_id));
@@ -138,7 +144,7 @@ fn test_dust_sweeping_with_actual_dust() {
     for i in 1u64..=10u64 {
         // Create stream with small amount that will become dust
         client.create_continuous_stream(&i, &1000, &1000);
-        
+
         // Simulate flow to create dust remainder
         let mut flow = ContinuousFlow {
             stream_id: i,
@@ -149,7 +155,9 @@ fn test_dust_sweeping_with_actual_dust() {
             status: StreamStatus::Depleted,
             reserved: [0u8; 7],
         };
-        env.storage().instance().set(&DataKey::ContinuousFlow(i), &flow);
+        env.storage()
+            .instance()
+            .set(&DataKey::ContinuousFlow(i), &flow);
     }
 
     // Count streams with dust
@@ -182,7 +190,7 @@ fn test_unauthorized_admin_access() {
 
     let unauthorized = Address::generate(&env);
     client.set_admin(&unauthorized);
-    
+
     // This should panic
     require_admin_auth(&env);
 }
@@ -215,7 +223,9 @@ fn test_multi_asset_dust_handling() {
             status: StreamStatus::Depleted,
             reserved: [0u8; 7],
         };
-        env.storage().instance().set(&DataKey::ContinuousFlow(i), &flow);
+        env.storage()
+            .instance()
+            .set(&DataKey::ContinuousFlow(i), &flow);
     }
 
     // USDC streams
@@ -230,7 +240,9 @@ fn test_multi_asset_dust_handling() {
             status: StreamStatus::Depleted,
             reserved: [0u8; 7],
         };
-        env.storage().instance().set(&DataKey::ContinuousFlow(i), &flow);
+        env.storage()
+            .instance()
+            .set(&DataKey::ContinuousFlow(i), &flow);
     }
 
     // Sweep XLM dust
@@ -244,10 +256,13 @@ fn test_multi_asset_dust_handling() {
     // Verify independent aggregation
     let xlm_agg = client.get_dust_aggregation(&xlm_address);
     let usdc_agg = client.get_dust_aggregation(&usdc_address);
-    
+
     assert!(xlm_agg.is_some());
     assert!(usdc_agg.is_some());
-    assert_ne!(xlm_agg.unwrap().stream_count, usdc_agg.unwrap().stream_count);
+    assert_ne!(
+        xlm_agg.unwrap().stream_count,
+        usdc_agg.unwrap().stream_count
+    );
 }
 
 #[test]
@@ -277,12 +292,16 @@ fn test_gas_bounty_mechanism() {
         status: StreamStatus::Depleted,
         reserved: [0u8; 7],
     };
-    env.storage().instance().set(&DataKey::ContinuousFlow(1u64), &flow);
+    env.storage()
+        .instance()
+        .set(&DataKey::ContinuousFlow(1u64), &flow);
 
     // Simulate sweeper call (non-admin)
     // Note: In real implementation, this would require proper auth from sweeper
     // For test, we'll check that bounty pool decreases
-    let initial_bounty = env.storage().instance()
+    let initial_bounty = env
+        .storage()
+        .instance()
         .get::<DataKey, i128>(&DataKey::GasBountyPool)
         .unwrap();
 
@@ -309,13 +328,13 @@ fn test_massive_dust_sweeping_performance() {
     // Create 10,000 streams with dust
     let stream_count = 10000u64;
     let batch_size = 1000u64;
-    
+
     for batch_start in (1..=stream_count).step_by(batch_size as usize) {
         let batch_end = (batch_start + batch_size - 1).min(stream_count);
-        
+
         for stream_id in batch_start..=batch_end {
             client.create_continuous_stream(&stream_id, &1000, &1000);
-            
+
             let mut flow = ContinuousFlow {
                 stream_id,
                 flow_rate_per_second: 1000,
@@ -325,7 +344,9 @@ fn test_massive_dust_sweeping_performance() {
                 status: StreamStatus::Depleted,
                 reserved: [0u8; 7],
             };
-            env.storage().instance().set(&DataKey::ContinuousFlow(stream_id), &flow);
+            env.storage()
+                .instance()
+                .set(&DataKey::ContinuousFlow(stream_id), &flow);
         }
     }
 
@@ -340,11 +361,11 @@ fn test_massive_dust_sweeping_performance() {
     // Sweep in batches to avoid gas limits
     let mut total_swept = 0u64;
     let mut total_dust_amount = 0i128;
-    
+
     for batch_start in (1..=stream_count).step_by(MAX_SWEEP_STREAMS_PER_CALL as usize) {
         let batch_end = (batch_start + MAX_SWEEP_STREAMS_PER_CALL - 1).min(stream_count);
         let streams_in_batch = batch_end - batch_start + 1;
-        
+
         let sweep_result = client.sweep_dust(&token_address, Some(streams_in_batch));
         total_swept += sweep_result.streams_swept;
         total_dust_amount += sweep_result.total_dust_swept;
@@ -352,7 +373,7 @@ fn test_massive_dust_sweeping_performance() {
 
     // Verify all dust was swept
     assert_eq!(total_swept, total_dust_streams);
-    
+
     // Verify final aggregation
     let final_aggregation = client.get_dust_aggregation(&token_address);
     assert!(final_aggregation.is_some());
@@ -387,7 +408,7 @@ fn test_total_supply_invariant() {
     // Create streams with known balances
     let initial_balances = vec![1000i128, 2000i128, 500i128];
     let mut total_initial = 0i128;
-    
+
     for (i, &balance) in initial_balances.iter().enumerate() {
         let stream_id = (i + 1) as u64;
         client.create_continuous_stream(&stream_id, &100, &balance);
@@ -406,14 +427,19 @@ fn test_total_supply_invariant() {
             status: StreamStatus::Depleted,
             reserved: [0u8; 7],
         };
-        env.storage().instance().set(&DataKey::ContinuousFlow(stream_id), &flow);
+        env.storage()
+            .instance()
+            .set(&DataKey::ContinuousFlow(stream_id), &flow);
     }
 
     // Calculate total before sweep
     let mut total_before = 0i128;
     for stream_id in 1u64..=3u64 {
-        if let Some(flow) = env.storage().instance()
-            .get::<DataKey, ContinuousFlow>(&DataKey::ContinuousFlow(stream_id)) {
+        if let Some(flow) = env
+            .storage()
+            .instance()
+            .get::<DataKey, ContinuousFlow>(&DataKey::ContinuousFlow(stream_id))
+        {
             total_before += flow.accumulated_balance;
         }
     }
@@ -424,15 +450,18 @@ fn test_total_supply_invariant() {
     // Calculate total after sweep
     let mut total_after = 0i128;
     for stream_id in 1u64..=3u64 {
-        if let Some(flow) = env.storage().instance()
-            .get::<DataKey, ContinuousFlow>(&DataKey::ContinuousFlow(stream_id)) {
+        if let Some(flow) = env
+            .storage()
+            .instance()
+            .get::<DataKey, ContinuousFlow>(&DataKey::ContinuousFlow(stream_id))
+        {
             total_after += flow.accumulated_balance;
         }
     }
 
     // Verify invariant: total_before = total_after + dust_swept
     assert_eq!(total_before, total_after + sweep_result.total_dust_swept);
-    
+
     // Verify dust was transferred to treasury
     // In a real implementation, this would check treasury balance
     assert!(sweep_result.total_dust_swept > 0);

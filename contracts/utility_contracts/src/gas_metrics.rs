@@ -23,18 +23,17 @@
 ///   2. Metrics are captured with minimal overhead
 ///   3. Reports show gas vs estimated costs
 ///   4. Regression detection alerts on unexpected increases
-
 extern crate std;
 
+use alloc::string::String;
+use alloc::vec::Vec;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::format;
+use std::println;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::println;
-use std::format;
 use std::vec;
-use alloc::vec::Vec;
-use alloc::string::String;
 
 // ============================================================================
 // Constants for Gas Cost Baseline
@@ -231,8 +230,10 @@ impl GasMeter {
     /// Get statistics for all operations
     pub fn get_all_statistics(&self) -> BTreeMap<String, GasStatistics> {
         let measurements = self.measurements.lock().unwrap();
-        let mut operation_names: std::collections::HashSet<_> =
-            measurements.iter().map(|m| m.operation_name.clone()).collect();
+        let mut operation_names: std::collections::HashSet<_> = measurements
+            .iter()
+            .map(|m| m.operation_name.clone())
+            .collect();
 
         operation_names
             .into_iter()
@@ -317,18 +318,17 @@ impl GasReport {
         println!("Total Estimated Gas: {} stroops", self.total_estimated_gas);
         println!("Average Efficiency Ratio: {:.4}x", self.average_efficiency);
         println!("\nOperation Breakdown:");
-        println!("{:<40} {:>15} {:>15} {:>15} {:>12}", "Operation", "Count", "Avg Gas", "Estimated", "Ratio");
+        println!(
+            "{:<40} {:>15} {:>15} {:>15} {:>12}",
+            "Operation", "Count", "Avg Gas", "Estimated", "Ratio"
+        );
         println!("{}", "=".repeat(100));
 
         for (op_name, stats) in &self.operation_statistics {
             let ratio = stats.efficiency_ratio();
             println!(
                 "{:<40} {:>15} {:>15} {:>15} {:>12.4}x",
-                op_name,
-                stats.count,
-                stats.avg_gas,
-                stats.avg_estimated,
-                ratio
+                op_name, stats.count, stats.avg_gas, stats.avg_estimated, ratio
             );
         }
         println!("\n");
@@ -380,17 +380,17 @@ where
     F: FnOnce() -> T,
 {
     let operation_name = operation_name.into();
-    
+
     // Get CPU time before
     let start = std::time::Instant::now();
-    
+
     // Execute operation
     let result = f();
-    
+
     // Get CPU time after (as proxy for gas usage in tests)
     let duration = start.elapsed();
     let actual_gas = (duration.as_micros() as i128) * 1000; // Convert to approximate stroops
-    
+
     GAS_METER.record_measurement(operation_name, estimated, actual_gas);
     result
 }
@@ -437,10 +437,18 @@ impl GasBenchmark {
 
     pub fn print_comparison(&self) {
         let improvement = self.improvement_percent();
-        let status = if improvement > 0.0 { "✓ IMPROVED" } else { "✗ REGRESSED" };
+        let status = if improvement > 0.0 {
+            "✓ IMPROVED"
+        } else {
+            "✗ REGRESSED"
+        };
         println!(
             "{}: {} baseline → {} optimized ({} {:.2}%)",
-            self.operation_name, self.baseline_gas, self.optimized_gas, status, improvement.abs()
+            self.operation_name,
+            self.baseline_gas,
+            self.optimized_gas,
+            status,
+            improvement.abs()
         );
     }
 }

@@ -3,8 +3,8 @@
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{token, Address, Bytes, BytesN, Env, Vec};
 use utility_contracts::{
-    UtilityContractClient, ZKUsageReport, PrivateBillingStatus, MeterStatus, ContractError,
-    DataKey, ZKProof
+    ContractError, DataKey, MeterStatus, PrivateBillingStatus, UtilityContractClient, ZKProof,
+    ZKUsageReport,
 };
 
 // --- Helpers ---
@@ -17,7 +17,13 @@ fn create_token(env: &Env) -> Address {
     env.register_stellar_asset_contract_v2(admin).address()
 }
 
-fn create_test_meter(env: &Env, client: &UtilityContractClient, user: Address, provider: Address, token: Address) -> u64 {
+fn create_test_meter(
+    env: &Env,
+    client: &UtilityContractClient,
+    user: Address,
+    provider: Address,
+    token: Address,
+) -> u64 {
     let device_public_key = BytesN::from_array(env, &[1u8; 32]);
     client.register_meter(&user, &provider, &10, &token, &device_public_key)
 }
@@ -33,7 +39,7 @@ fn test_enable_privacy_mode() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Enable privacy mode
@@ -62,7 +68,7 @@ fn test_disable_privacy_mode() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Enable privacy mode first
@@ -85,7 +91,7 @@ fn test_submit_zk_usage_report() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Enable privacy mode
@@ -123,7 +129,7 @@ fn test_nullifier_prevention() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Enable privacy mode
@@ -150,7 +156,13 @@ fn test_nullifier_prevention() {
     let result = env.try_invoke_contract::<_, ()>(
         &contract_id,
         &soroban_sdk::Symbol::new(&env, "submit_zk_usage_report"),
-        (meter_id, commitment2, nullifier, encrypted_usage, proof_hash2),
+        (
+            meter_id,
+            commitment2,
+            nullifier,
+            encrypted_usage,
+            proof_hash2,
+        ),
     );
 
     // Should fail with NullifierAlreadyUsed error
@@ -168,7 +180,7 @@ fn test_get_status_with_privacy() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Test status without privacy
@@ -208,7 +220,7 @@ fn test_verify_zk_proof() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Enable privacy mode
@@ -241,7 +253,7 @@ fn test_privacy_not_enabled_error() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Try to submit ZK report without enabling privacy
@@ -271,7 +283,7 @@ fn test_zk_verification_caching() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Enable privacy mode
@@ -303,7 +315,7 @@ fn test_complete_zk_privacy_workflow() {
     let user = Address::generate(&env);
     let provider = Address::generate(&env);
     let token = create_token(&env);
-    
+
     let meter_id = create_test_meter(&env, &client, user.clone(), provider.clone(), token);
 
     // Step 1: Enable privacy mode
@@ -317,7 +329,13 @@ fn test_complete_zk_privacy_workflow() {
         let encrypted_usage = Bytes::from_slice(&env, &format!("usage_data_{}", i).as_bytes());
         let proof_hash = BytesN::from_array(&env, &[i + 20; 32]);
 
-        client.submit_zk_usage_report(&meter_id, &commitment, &nullifier, &encrypted_usage, &proof_hash);
+        client.submit_zk_usage_report(
+            &meter_id,
+            &commitment,
+            &nullifier,
+            &encrypted_usage,
+            &proof_hash,
+        );
     }
 
     // Step 3: Verify commitments were recorded

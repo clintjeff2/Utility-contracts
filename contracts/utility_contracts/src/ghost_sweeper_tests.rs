@@ -1,11 +1,13 @@
 extern crate std;
 
-use soroban_sdk::{testutils::Address as TestAddress, testutils::BytesN as TestBytesN, Env, Address, Vec};
 use crate::ghost_sweeper::{
-    GhostSweeper, GhostStreamPruned, StreamArchive, PruneReason, GhostStreamCandidate,
-    SweeperResult, SweeperStatistics, GHOST_STREAM_THRESHOLD_DAYS
+    GhostStreamCandidate, GhostStreamPruned, GhostSweeper, PruneReason, StreamArchive,
+    SweeperResult, SweeperStatistics, GHOST_STREAM_THRESHOLD_DAYS,
 };
-use crate::{ContractError, DataKey, ContinuousFlow, StreamStatus};
+use crate::{ContinuousFlow, ContractError, DataKey, StreamStatus};
+use soroban_sdk::{
+    testutils::Address as TestAddress, testutils::BytesN as TestBytesN, Address, Env, Vec,
+};
 
 #[cfg(test)]
 pub mod ghost_sweeper_tests {
@@ -121,13 +123,15 @@ pub mod ghost_sweeper_tests {
         // Create multiple ghost streams — 5 fixed IDs, pre-built with vec! macro
         let stream_ids = soroban_sdk::vec![&env, 1u64, 2u64, 3u64, 4u64, 5u64];
         for stream_id in stream_ids.iter() {
-            let ghost_stream = create_ghost_stream(&env, stream_id, provider.clone(), payer.clone());
+            let ghost_stream =
+                create_ghost_stream(&env, stream_id, provider.clone(), payer.clone());
             let stream_key = DataKey::ContinuousFlow(stream_id);
             env.storage().persistent().set(&stream_key, &ghost_stream);
         }
 
         // Batch prune
-        let result = GhostSweeper::batch_prune_ghost_streams(env.clone(), stream_ids, relayer.clone());
+        let result =
+            GhostSweeper::batch_prune_ghost_streams(env.clone(), stream_ids, relayer.clone());
 
         // Verify results
         assert_eq!(result.streams_pruned, 5);
@@ -159,7 +163,7 @@ pub mod ghost_sweeper_tests {
             } else {
                 create_active_stream(&env, stream_id, provider.clone(), payer.clone())
             };
-            
+
             let stream_key = DataKey::ContinuousFlow(stream_id);
             env.storage().persistent().set(&stream_key, &stream);
         }
@@ -171,7 +175,8 @@ pub mod ghost_sweeper_tests {
         assert!(candidates.len() >= 3);
 
         // Check that ghost streams are marked as eligible
-        let eligible_count = candidates.iter()
+        let eligible_count = candidates
+            .iter()
             .filter(|c| c.is_eligible_for_pruning)
             .count();
         assert!(eligible_count >= 3);
@@ -201,7 +206,7 @@ pub mod ghost_sweeper_tests {
         assert!(archive.is_some());
 
         let archive = archive.unwrap();
-        
+
         // Verify archive integrity
         assert_eq!(archive.stream_id, stream_id);
         assert_eq!(archive.provider, provider);
@@ -226,8 +231,10 @@ pub mod ghost_sweeper_tests {
         let small_stream_id = 1u64;
         let large_stream_id = 2u64;
 
-        let small_stream = create_ghost_stream(&env, small_stream_id, provider.clone(), payer.clone());
-        let large_stream = create_large_ghost_stream(&env, large_stream_id, provider.clone(), payer.clone());
+        let small_stream =
+            create_ghost_stream(&env, small_stream_id, provider.clone(), payer.clone());
+        let large_stream =
+            create_large_ghost_stream(&env, large_stream_id, provider.clone(), payer.clone());
 
         let small_key = DataKey::ContinuousFlow(small_stream_id);
         let large_key = DataKey::ContinuousFlow(large_stream_id);
@@ -235,7 +242,8 @@ pub mod ghost_sweeper_tests {
         env.storage().persistent().set(&large_key, &large_stream);
 
         // Prune both streams
-        let small_bounty = GhostSweeper::prune_ghost_stream(env.clone(), small_stream_id, relayer.clone());
+        let small_bounty =
+            GhostSweeper::prune_ghost_stream(env.clone(), small_stream_id, relayer.clone());
         let large_bounty = GhostSweeper::prune_ghost_stream(env.clone(), large_stream_id, relayer);
 
         // Larger stream should have higher bounty
@@ -257,12 +265,12 @@ pub mod ghost_sweeper_tests {
         // Simulate long-term storage decay
         let mut total_initial_storage = 0u64;
         let stream_ids: Vec<u64> = (1..=100).collect();
-        
+
         for stream_id in stream_ids.iter() {
             let stream = create_ghost_stream(&env, *stream_id, provider.clone(), payer.clone());
             let stream_key = DataKey::ContinuousFlow(*stream_id);
             env.storage().persistent().set(&stream_key, &stream);
-            
+
             // Estimate storage size
             total_initial_storage += 500; // Estimated per stream
         }
@@ -318,7 +326,7 @@ pub mod ghost_sweeper_tests {
 
         let stream_key = DataKey::ContinuousFlow(stream_id);
         let mac_key = DataKey::DeviceHash(device_mac.clone());
-        
+
         env.storage().persistent().set(&stream_key, &ghost_stream);
         env.storage().persistent().set(&mac_key, &"some_mac_data");
 
@@ -331,7 +339,12 @@ pub mod ghost_sweeper_tests {
     }
 
     /// Helper function to create ghost stream
-    fn create_ghost_stream(env: &Env, stream_id: u64, provider: Address, payer: Address) -> ContinuousFlow {
+    fn create_ghost_stream(
+        env: &Env,
+        stream_id: u64,
+        provider: Address,
+        payer: Address,
+    ) -> ContinuousFlow {
         let current_time = env.ledger().timestamp();
         let old_timestamp = current_time - (GHOST_STREAM_THRESHOLD_DAYS + 10) * 24 * 60 * 60;
 
@@ -355,7 +368,12 @@ pub mod ghost_sweeper_tests {
     }
 
     /// Helper function to create active stream
-    fn create_active_stream(env: &Env, stream_id: u64, provider: Address, payer: Address) -> ContinuousFlow {
+    fn create_active_stream(
+        env: &Env,
+        stream_id: u64,
+        provider: Address,
+        payer: Address,
+    ) -> ContinuousFlow {
         let current_time = env.ledger().timestamp();
         let recent_timestamp = current_time - 24 * 60 * 60; // 1 day ago
 
@@ -379,13 +397,18 @@ pub mod ghost_sweeper_tests {
     }
 
     /// Helper function to create large ghost stream
-    fn create_large_ghost_stream(env: &Env, stream_id: u64, provider: Address, payer: Address) -> ContinuousFlow {
+    fn create_large_ghost_stream(
+        env: &Env,
+        stream_id: u64,
+        provider: Address,
+        payer: Address,
+    ) -> ContinuousFlow {
         let mut stream = create_ghost_stream(env, stream_id, provider, payer);
-        
+
         // Add some data to increase size
         stream.flow_rate_per_second = 1000000;
         stream.accumulated_balance = 0;
-        
+
         stream
     }
 }
@@ -409,9 +432,9 @@ mod ghost_sweeper_property_tests {
 
             // Property: bounty should be proportional to storage size
             let bounty = GhostSweeper::calculate_gas_bounty(storage_bytes);
-            
+
             prop_assert!(bounty > 0);
-            
+
             // Bounty should scale reasonably with storage
             let expected_min_bounty = storage_bytes as i128 * 500 / 10000; // 5% minimum
             prop_assert!(bounty >= expected_min_bounty);
@@ -458,7 +481,7 @@ mod ghost_sweeper_property_tests {
 
             // Check eligibility
             let candidate = GhostSweeper::check_stream_eligibility(env.clone(), stream_id);
-            
+
             if let Some(candidate) = candidate {
                 // Property: streams with balance or buffer should not be eligible
                 if has_balance || has_buffer {

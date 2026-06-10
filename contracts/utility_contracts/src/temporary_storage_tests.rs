@@ -1,18 +1,18 @@
 //! Tests for temporary storage optimizations
-//! 
+//!
 //! This module tests the temporary storage implementation to ensure
 //! it reduces ledger costs while maintaining data integrity and consistency.
 
 #[cfg(test)]
 mod tests {
     extern crate std;
-    use std::vec::Vec;
-    use std::format;
-    use soroban_sdk::{Address, Env, Symbol, BytesN};
     use crate::{
-        temporary_storage::{TempStorageManager, OptimizedFlowCalculator, OptimizedUsageTracker},
-        ContinuousFlow, StreamStatus, DataKey, Meter, UsageData, BillingType,
+        temporary_storage::{OptimizedFlowCalculator, OptimizedUsageTracker, TempStorageManager},
+        BillingType, ContinuousFlow, DataKey, Meter, StreamStatus, UsageData,
     };
+    use soroban_sdk::{Address, BytesN, Env, Symbol};
+    use std::format;
+    use std::vec::Vec;
 
     fn create_test_env() -> Env {
         let env = Env::default();
@@ -47,15 +47,21 @@ mod tests {
         let current_timestamp = 2000;
 
         // First calculation should store in temp storage
-        let result1 = OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
-        assert_eq!(result1, 100 * (current_timestamp - flow.last_flow_timestamp) as i128);
+        let result1 =
+            OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
+        assert_eq!(
+            result1,
+            100 * (current_timestamp - flow.last_flow_timestamp) as i128
+        );
 
         // Second calculation should use temp storage
-        let result2 = OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
+        let result2 =
+            OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
         assert_eq!(result1, result2);
 
         // Verify temp storage contains the data
-        let (accumulation, timestamp) = TempStorageManager::get_flow_accumulation(&env, flow.stream_id).unwrap();
+        let (accumulation, timestamp) =
+            TempStorageManager::get_flow_accumulation(&env, flow.stream_id).unwrap();
         assert_eq!(accumulation, result1);
         assert_eq!(timestamp, current_timestamp);
     }
@@ -68,12 +74,17 @@ mod tests {
         let timestamp = 2000;
 
         // Store usage delta in temp storage
-        OptimizedUsageTracker::track_usage_with_temp_storage(&env, meter_id, usage_delta, timestamp);
+        OptimizedUsageTracker::track_usage_with_temp_storage(
+            &env,
+            meter_id,
+            usage_delta,
+            timestamp,
+        );
 
         // Retrieve and clear the delta
-        let (retrieved_delta, retrieved_timestamp) = 
+        let (retrieved_delta, retrieved_timestamp) =
             TempStorageManager::get_and_clear_meter_usage_delta(&env, meter_id).unwrap();
-        
+
         assert_eq!(retrieved_delta, usage_delta);
         assert_eq!(retrieved_timestamp, timestamp);
 
@@ -86,7 +97,7 @@ mod tests {
     fn test_temp_storage_provider_window() {
         let env = create_test_env();
         let provider = Address::generate(&env);
-        
+
         let window = crate::ProviderWithdrawalWindow {
             daily_withdrawn: 1000,
             last_reset: 1000,
@@ -185,8 +196,9 @@ mod tests {
         flow.status = StreamStatus::Paused;
 
         let current_timestamp = 2000;
-        let result = OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
-        
+        let result =
+            OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
+
         // Paused flows should return zero accumulation
         assert_eq!(result, 0);
     }
@@ -195,10 +207,10 @@ mod tests {
     fn test_usage_tracking_threshold() {
         let env = create_test_env();
         let meter_id = 1;
-        
+
         // Track small usage (below threshold)
         OptimizedUsageTracker::track_usage_with_temp_storage(&env, meter_id, 100, 2000);
-        
+
         // Should still be in temp storage
         let result = TempStorageManager::get_and_clear_meter_usage_delta(&env, meter_id);
         assert!(result.is_some());
@@ -206,7 +218,7 @@ mod tests {
         // Track large usage (above threshold of 1,000,000,000)
         let large_usage = 2_000_000_000;
         OptimizedUsageTracker::track_usage_with_temp_storage(&env, meter_id, large_usage, 3000);
-        
+
         // Should trigger flush to persistent storage
         // Note: In a real implementation, this would update the persistent meter data
         let result = TempStorageManager::get_and_clear_meter_usage_delta(&env, meter_id);
@@ -222,15 +234,17 @@ mod tests {
         let flow = create_test_flow(stream_id, 100, 1000);
 
         // Store accumulation
-        let result = OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
-        
+        let result =
+            OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, current_timestamp);
+
         // Verify it's stored
         let stored = TempStorageManager::get_flow_accumulation(&env, stream_id);
         assert!(stored.is_some());
 
         // Simulate ledger advancement beyond TTL (5 ledgers)
         for _ in 0..6 {
-            env.ledger().set(env.ledger().sequence() + 1, env.ledger().timestamp() + 1);
+            env.ledger()
+                .set(env.ledger().sequence() + 1, env.ledger().timestamp() + 1);
         }
 
         // Data should still be accessible within TTL period
@@ -242,7 +256,7 @@ mod tests {
     #[test]
     fn test_concurrent_temp_storage_operations() {
         let env = create_test_env();
-        
+
         // Test multiple streams simultaneously
         let flow1 = create_test_flow(1, 100, 1000);
         let flow2 = create_test_flow(2, 200, 2000);
@@ -281,7 +295,8 @@ mod tests {
         let mut results = Vec::new(&env);
 
         for _ in 0..10 {
-            let result = OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, timestamp);
+            let result =
+                OptimizedFlowCalculator::calculate_with_temp_storage(&env, &flow, timestamp);
             results.push_back(result);
         }
 
