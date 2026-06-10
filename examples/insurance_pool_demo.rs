@@ -93,10 +93,10 @@ impl InsurancePoolDemo {
         // Simplified risk calculation
         // In real implementation, this would consider:
         // - Payment history
-        // - Usage stability  
+        // - Usage stability
         // - Device security
         // - Account tenure
-        
+
         // Simple hash-based pseudo-random for demo
         let mut hash = 0u32;
         for byte in user_id.bytes() {
@@ -145,7 +145,7 @@ impl InsurancePoolDemo {
 
     fn process_claim(&mut self, claim_id: u64) -> Result<(), String> {
         let claim = self.claims.get_mut(&claim_id).ok_or("Claim not found")?;
-        
+
         if claim.is_processed {
             return Err("Claim already processed".to_string());
         }
@@ -166,7 +166,12 @@ impl InsurancePoolDemo {
         Ok(())
     }
 
-    fn create_proposal(&mut self, proposer: String, proposal_type: String, new_value: i128) -> Result<u64, String> {
+    fn create_proposal(
+        &mut self,
+        proposer: String,
+        proposal_type: String,
+        new_value: i128,
+    ) -> Result<u64, String> {
         if !self.members.contains_key(&proposer) {
             return Err("Not a pool member".to_string());
         }
@@ -188,13 +193,21 @@ impl InsurancePoolDemo {
         Ok(proposal_id)
     }
 
-    fn vote_on_proposal(&mut self, voter: String, proposal_id: u64, vote_for: bool) -> Result<(), String> {
+    fn vote_on_proposal(
+        &mut self,
+        voter: String,
+        proposal_id: u64,
+        vote_for: bool,
+    ) -> Result<(), String> {
         if !self.members.contains_key(&voter) {
             return Err("Not a pool member".to_string());
         }
 
-        let proposal = self.proposals.get_mut(&proposal_id).ok_or("Proposal not found")?;
-        
+        let proposal = self
+            .proposals
+            .get_mut(&proposal_id)
+            .ok_or("Proposal not found")?;
+
         if proposal.is_executed {
             return Err("Proposal already executed".to_string());
         }
@@ -212,8 +225,11 @@ impl InsurancePoolDemo {
     }
 
     fn execute_proposal(&mut self, proposal_id: u64) -> Result<(), String> {
-        let proposal = self.proposals.get_mut(&proposal_id).ok_or("Proposal not found")?;
-        
+        let proposal = self
+            .proposals
+            .get_mut(&proposal_id)
+            .ok_or("Proposal not found")?;
+
         if proposal.is_executed {
             return Err("Proposal already executed".to_string());
         }
@@ -241,7 +257,11 @@ impl InsurancePoolDemo {
     }
 
     fn get_pool_stats(&self) -> (i128, u32, i128) {
-        (self.pool.total_funds, self.pool.total_members, self.pool.base_premium_rate_bps)
+        (
+            self.pool.total_funds,
+            self.pool.total_members,
+            self.pool.base_premium_rate_bps,
+        )
     }
 }
 
@@ -253,10 +273,10 @@ fn main() {
 
     // Demo scenario: Multiple users join the pool
     println!("📝 Step 1: Users join the insurance pool");
-    
+
     let users = vec![
-        ("alice", 5_000_000_000i128), // 5000 XLM
-        ("bob", 3_000_000_000i128),   // 3000 XLM  
+        ("alice", 5_000_000_000i128),   // 5000 XLM
+        ("bob", 3_000_000_000i128),     // 3000 XLM
         ("charlie", 2_000_000_000i128), // 2000 XLM
     ];
 
@@ -268,27 +288,36 @@ fn main() {
     }
 
     let (funds, members, rate) = demo.get_pool_stats();
-    println!("\n📊 Pool Stats: {} stroops, {} members, {}bps rate\n", funds, members, rate);
+    println!(
+        "\n📊 Pool Stats: {} stroops, {} members, {}bps rate\n",
+        funds, members, rate
+    );
 
     // Demo scenario: Submit claims
     println!("🚨 Step 2: Submit insurance claims");
-    
+
     // Small claim (auto-approved)
-    match demo.submit_claim("alice".to_string(), 50_000_000) { // 50 XLM
+    match demo.submit_claim("alice".to_string(), 50_000_000) {
+        // 50 XLM
         Ok(claim_id) => {
             let claim = demo.claims.get(&claim_id).unwrap();
-            println!("✅ Alice's claim #{}: {} stroops (auto-approved: {})", 
-                claim_id, claim.amount, claim.auto_approved);
+            println!(
+                "✅ Alice's claim #{}: {} stroops (auto-approved: {})",
+                claim_id, claim.amount, claim.auto_approved
+            );
         }
         Err(e) => println!("❌ Alice's claim failed: {}", e),
     }
 
     // Larger claim (requires approval)
-    match demo.submit_claim("bob".to_string(), 500_000_000) { // 500 XLM
+    match demo.submit_claim("bob".to_string(), 500_000_000) {
+        // 500 XLM
         Ok(claim_id) => {
             let claim = demo.claims.get(&claim_id).unwrap();
-            println!("✅ Bob's claim #{}: {} stroops (auto-approved: {})", 
-                claim_id, claim.amount, claim.auto_approved);
+            println!(
+                "✅ Bob's claim #{}: {} stroops (auto-approved: {})",
+                claim_id, claim.amount, claim.auto_approved
+            );
         }
         Err(e) => println!("❌ Bob's claim failed: {}", e),
     }
@@ -298,19 +327,25 @@ fn main() {
 
     // Demo scenario: Governance proposal
     println!("🗳️  Step 3: Create and vote on governance proposal");
-    
+
     match demo.create_proposal("alice".to_string(), "ChangePremiumRate".to_string(), 150) {
         Ok(proposal_id) => {
-            println!("✅ Alice created proposal #{}: Change premium rate to 150bps (1.5%)", proposal_id);
-            
+            println!(
+                "✅ Alice created proposal #{}: Change premium rate to 150bps (1.5%)",
+                proposal_id
+            );
+
             // Members vote
             let _ = demo.vote_on_proposal("alice".to_string(), proposal_id, true);
             let _ = demo.vote_on_proposal("bob".to_string(), proposal_id, true);
             let _ = demo.vote_on_proposal("charlie".to_string(), proposal_id, false);
-            
+
             let proposal = demo.proposals.get(&proposal_id).unwrap();
-            println!("📊 Votes: {} for, {} against", proposal.votes_for, proposal.votes_against);
-            
+            println!(
+                "📊 Votes: {} for, {} against",
+                proposal.votes_for, proposal.votes_against
+            );
+
             // Execute proposal
             match demo.execute_proposal(proposal_id) {
                 Ok(_) => {
@@ -330,7 +365,7 @@ fn main() {
     println!("   • Democratic governance with voting");
     println!("   • Proposal execution with threshold checks");
     println!("   • Pool fund management and tracking");
-    
+
     println!("\n🔗 Integration Points:");
     println!("   • Automatic fee allocation from utility claims");
     println!("   • Emergency funding for failing utility streams");
@@ -362,7 +397,8 @@ mod tests {
     #[test]
     fn test_duplicate_join() {
         let mut demo = InsurancePoolDemo::new();
-        demo.join_pool("test_user".to_string(), 1_000_000_000).unwrap();
+        demo.join_pool("test_user".to_string(), 1_000_000_000)
+            .unwrap();
         let result = demo.join_pool("test_user".to_string(), 1_000_000_000);
         assert!(result.is_err());
     }
@@ -370,11 +406,12 @@ mod tests {
     #[test]
     fn test_claim_submission() {
         let mut demo = InsurancePoolDemo::new();
-        demo.join_pool("test_user".to_string(), 10_000_000_000).unwrap(); // 10k XLM
-        
+        demo.join_pool("test_user".to_string(), 10_000_000_000)
+            .unwrap(); // 10k XLM
+
         let result = demo.submit_claim("test_user".to_string(), 50_000_000); // 50 XLM
         assert!(result.is_ok());
-        
+
         let claim_id = result.unwrap();
         let claim = demo.claims.get(&claim_id).unwrap();
         assert_eq!(claim.amount, 50_000_000);
@@ -383,15 +420,13 @@ mod tests {
     #[test]
     fn test_governance_proposal() {
         let mut demo = InsurancePoolDemo::new();
-        demo.join_pool("proposer".to_string(), 5_000_000_000).unwrap();
-        
-        let result = demo.create_proposal(
-            "proposer".to_string(), 
-            "ChangePremiumRate".to_string(), 
-            200
-        );
+        demo.join_pool("proposer".to_string(), 5_000_000_000)
+            .unwrap();
+
+        let result =
+            demo.create_proposal("proposer".to_string(), "ChangePremiumRate".to_string(), 200);
         assert!(result.is_ok());
-        
+
         let proposal_id = result.unwrap();
         let proposal = demo.proposals.get(&proposal_id).unwrap();
         assert_eq!(proposal.new_value, 200);
@@ -402,16 +437,14 @@ mod tests {
     fn test_voting() {
         let mut demo = InsurancePoolDemo::new();
         demo.join_pool("voter".to_string(), 3_000_000_000).unwrap();
-        
-        let proposal_id = demo.create_proposal(
-            "voter".to_string(),
-            "ChangePremiumRate".to_string(),
-            150
-        ).unwrap();
-        
+
+        let proposal_id = demo
+            .create_proposal("voter".to_string(), "ChangePremiumRate".to_string(), 150)
+            .unwrap();
+
         let result = demo.vote_on_proposal("voter".to_string(), proposal_id, true);
         assert!(result.is_ok());
-        
+
         let proposal = demo.proposals.get(&proposal_id).unwrap();
         assert!(proposal.votes_for > 0);
     }
