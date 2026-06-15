@@ -128,8 +128,8 @@ pub enum GrantError {
     Unauthorized = 7,
 }
 
-#[contractclient(name = "UtilityDripClient")]
-pub trait UtilityDrip {
+#[contractclient(name = "IoTBillingServiceClient")]
+pub trait IoTBillingService {
     fn get_conservation_goal(env: Env, goal_id: u64) -> super::ConservationGoal;
 }
 

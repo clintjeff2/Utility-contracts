@@ -263,7 +263,7 @@ Include:
 
 ## 📞 Get Help
 
-- **Discord**: [Utility-Drip Community](https://discord.gg/utilitydrip)
+- **Discord**: [IoT-Billing-Service Community](https://discord.gg/iotbilling)
 - **GitHub Issues**: For bug reports and feature requests
 - **Documentation**: Check the `/docs` directory
 - **Examples**: See `/examples` directory
