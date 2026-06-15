@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# IoT-Billing-Service PRE-FLIGHT SANITY CHECK SUITE (Issue #111)
+# Utility-Protocol PRE-FLIGHT SANITY CHECK SUITE (Issue #111)
 # Description: Dry-run simulation for mainnet deployment validation.
 # ==============================================================================
 

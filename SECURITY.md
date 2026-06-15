@@ -3,7 +3,7 @@
 ## Reporting a Vulnerability
 
 Please report security vulnerabilities by opening a **private** GitHub Security Advisory at:
-`https://github.com/IoT-Billing-Service/Billing-contracts/security/advisories/new`
+`https://github.com/Utility-Protocol/Utility-contracts/security/advisories/new`
 
 Do **not** open a public issue for security-sensitive findings.
 

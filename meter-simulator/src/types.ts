@@ -1,8 +1,8 @@
 /**
- * TypeScript bindings for IoT-Billing-Service Smart Contract
+ * TypeScript bindings for Utility-Protocol Smart Contract
  * These types are auto-generated from the Soroban contract definitions
  * 
- * @fileoverview Type-safe interfaces for interacting with the IoT-Billing-Service contract
+ * @fileoverview Type-safe interfaces for interacting with the Utility-Protocol contract
  * @version 1.0.0
  */
 
@@ -261,7 +261,7 @@ export interface TransferMeterOwnershipParams {
 // ============================================================================
 
 /**
- * IoT-Billing-Service Contract Interface
+ * Utility-Protocol Contract Interface
  * Provides type-safe methods for interacting with the smart contract
  */
 export interface UtilityContract {

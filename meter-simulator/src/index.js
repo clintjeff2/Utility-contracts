@@ -18,7 +18,7 @@ const program = new Command();
 
 program
   .name('meter-simulator')
-  .description('ESP32 meter simulator for IoT-Billing-Service smart contracts')
+  .description('ESP32 meter simulator for Utility-Protocol smart contracts')
   .version('1.0.0');
 
 // Generate device key pair

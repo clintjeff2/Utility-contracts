@@ -1,4 +1,4 @@
-name: IoT-Billing-Service CI
+name: Utility-Protocol CI
 
 on:
   push:

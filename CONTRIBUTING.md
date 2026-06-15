@@ -1,10 +1,10 @@
-# Contributing to Billing-contracts
+# Contributing to Utility-contracts
 
-Welcome to the Billing-contracts project! This guide will help you contribute effectively, whether you're working on hardware (C++/Arduino) or smart contracts (Soroban/Rust).
+Welcome to the Utility-contracts project! This guide will help you contribute effectively, whether you're working on hardware (C++/Arduino) or smart contracts (Soroban/Rust).
 
 ## Project Overview
 
-Billing-contracts is a utility billing system built on Stellar that allows:
+Utility-contracts is a utility billing system built on Stellar that allows:
 - Individual meter billing and management
 - Group billing for property managers
 - Real-time balance monitoring
@@ -156,8 +156,8 @@ make test
 
 ### 1. Fork and Clone
 ```bash
-git clone https://github.com/your-username/Billing-contracts.git
-cd Billing-contracts
+git clone https://github.com/your-username/Utility-contracts.git
+cd Utility-contracts
 ```
 
 ### 2. Create Feature Branch
@@ -263,7 +263,7 @@ Include:
 
 ## 📞 Get Help
 
-- **Discord**: [IoT-Billing-Service Community](https://discord.gg/iotbilling)
+- **Discord**: [Utility-Protocol Community](https://discord.gg/iotbilling)
 - **GitHub Issues**: For bug reports and feature requests
 - **Documentation**: Check the `/docs` directory
 - **Examples**: See `/examples` directory
@@ -274,4 +274,4 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 ---
 
-Thank you for contributing to Billing-contracts! 🎉
+Thank you for contributing to Utility-contracts! 🎉

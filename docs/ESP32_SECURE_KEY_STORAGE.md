@@ -4,7 +4,7 @@ A comprehensive guide for contributors on securely storing Ed25519 keys on ESP32
 
 ## Overview
 
-The IoT-Billing-Service system requires each ESP32 device to:
+The Utility-Protocol system requires each ESP32 device to:
 1. Generate an Ed25519 key pair
 2. Store the private key securely
 3. Use the private key to sign usage data
@@ -70,7 +70,7 @@ Choose the appropriate level based on your threat model:
 #include <mbedtls/ed25519.h>
 
 // NVS namespace for key storage
-static const char* KEY_NAMESPACE = "iot_billing";
+static const char* KEY_NAMESPACE = "utility_protocol";
 static const char* PRIVATE_KEY_KEY = "priv_key";
 static const char* PUBLIC_KEY_KEY = "pub_key";
 
@@ -722,8 +722,8 @@ public:
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-// IoT-Billing-Service contract integration
-#include "iot_billing_types.h"
+// Utility-Protocol contract integration
+#include "utility_protocol_types.h"
 
 class SecureMeter {
 private:
@@ -846,7 +846,7 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
 
-    Serial.println("\n🚀 IoT-Billing-Service Meter Starting...");
+    Serial.println("\n🚀 Utility-Protocol Meter Starting...");
 
     // Initialize secure storage
     if (!meter.begin()) {
@@ -1041,7 +1041,7 @@ void setup() {
 - [ATECC608A Datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/20005926A.pdf)
 - [CryptoAuthLib Documentation](https://microchipcrypto.gitlab.io/avr-crypto-lib/)
 - [Ed25519 Specification](https://ed25519.cr.yp.to/)
-- [IoT-Billing-Service Contract Docs](../README.md)
+- [Utility-Protocol Contract Docs](../README.md)
 
 ---
 

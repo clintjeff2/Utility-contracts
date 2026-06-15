@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ################################################################################
-# IoT-Billing-Service Contract Deployment Script
+# Utility-Protocol Contract Deployment Script
 # 
 # This script pulls the Stellar Docker image and deploys the Utility contract
 # to either testnet or mainnet with a single command.
@@ -63,7 +63,7 @@ print_step() {
 
 usage() {
     cat << EOF
-IoT-Billing-Service Contract Deployment Script
+Utility-Protocol Contract Deployment Script
 
 Usage:
   $0 --network <testnet|mainnet> [--key <secret-key>]

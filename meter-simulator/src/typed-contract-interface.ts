@@ -1,8 +1,8 @@
 /**
- * Type-safe Contract Interface for IoT-Billing-Service Smart Contract
+ * Type-safe Contract Interface for Utility-Protocol Smart Contract
  * 
  * This module provides a fully-typed interface for interacting with the
- * IoT-Billing-Service Soroban smart contract on Stellar.
+ * Utility-Protocol Soroban smart contract on Stellar.
  */
 
 import {

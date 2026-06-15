@@ -1,4 +1,4 @@
-# 🌍 IoT-Billing-Service Multi-Language Error Mapping
+# 🌍 Utility-Protocol Multi-Language Error Mapping
 
 This document provides a mapping of on-chain error codes to human-readable descriptions in multiple languages. This ensures accessibility for users in rural areas and non-English speaking regions (Issue #122).
 

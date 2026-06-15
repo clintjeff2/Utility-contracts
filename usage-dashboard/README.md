@@ -1,6 +1,6 @@
-# IoT-Billing-Service - Usage Dashboard
+# Utility-Protocol - Usage Dashboard
 
-A modern, real-time dashboard for visualizing kWh usage vs. XLM spend in the IoT-Billing-Service smart contract system.
+A modern, real-time dashboard for visualizing kWh usage vs. XLM spend in the Utility-Protocol smart contract system.
 
 ## Features
 
@@ -39,8 +39,8 @@ A modern, real-time dashboard for visualizing kWh usage vs. XLM spend in the IoT
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/IoT-Billing-Service/Billing-contracts.git
-cd Billing-contracts/usage-dashboard
+git clone https://github.com/Utility-Protocol/Utility-contracts.git
+cd Utility-contracts/usage-dashboard
 ```
 
 2. Install dependencies:
@@ -105,7 +105,7 @@ interface MeterData {
 
 ## Integration with Smart Contracts
 
-This dashboard is designed to work with the IoT-Billing-Service smart contracts:
+This dashboard is designed to work with the Utility-Protocol smart contracts:
 
 - **Contract ID**: CB7PSJZALNWNX7NLOAM6LOEL4OJZMFPQZJMIYO522ZSACYWXTZIDEDSS
 - **Network**: Stellar Testnet

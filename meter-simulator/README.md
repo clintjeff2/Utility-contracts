@@ -1,6 +1,6 @@
 # Meter Simulator CLI
 
-A Node.js CLI tool that mimics an ESP32 sending usage data to the IoT-Billing-Service smart contracts for local development and testing.
+A Node.js CLI tool that mimics an ESP32 sending usage data to the Utility-Protocol smart contracts for local development and testing.
 
 ## Features
 
@@ -16,8 +16,8 @@ A Node.js CLI tool that mimics an ESP32 sending usage data to the IoT-Billing-Se
 
 ```bash
 # Clone the repository
-git clone https://github.com/IoT-Billing-Service/Billing-contracts.git
-cd Billing-contracts/meter-simulator
+git clone https://github.com/Utility-Protocol/Utility-contracts.git
+cd Utility-contracts/meter-simulator
 
 # Install dependencies
 npm install
@@ -146,7 +146,7 @@ The simulator can publish usage data via MQTT to match real ESP32 behavior:
 
 ## Contract Integration
 
-The simulator integrates with the IoT-Billing-Service smart contract:
+The simulator integrates with the Utility-Protocol smart contract:
 
 ### Signed Usage Data
 
@@ -249,6 +249,6 @@ MIT License - see LICENSE file for details.
 
 ## Support
 
-- 📖 [IoT-Billing-Service Documentation](../README.md)
-- 🐛 [Issues](https://github.com/IoT-Billing-Service/Billing-contracts/issues)
-- 💬 [Discussions](https://github.com/IoT-Billing-Service/Billing-contracts/discussions)
+- 📖 [Utility-Protocol Documentation](../README.md)
+- 🐛 [Issues](https://github.com/Utility-Protocol/Utility-contracts/issues)
+- 💬 [Discussions](https://github.com/Utility-Protocol/Utility-contracts/discussions)
