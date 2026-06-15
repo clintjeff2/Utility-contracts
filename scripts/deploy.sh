@@ -383,7 +383,7 @@ display_summary() {
 
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║          🎉 UTILITY DRIP DEPLOYMENT COMPLETE 🎉           ║
+║          🎉 UTILITY PROTOCOL DEPLOYMENT COMPLETE 🎉       ║
 ║                                                           ║
 ╠═══════════════════════════════════════════════════════════╣
 ║                                                           ║

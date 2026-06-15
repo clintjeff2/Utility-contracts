@@ -182,7 +182,7 @@ After successful deployment, you'll receive:
 
 ```
 ╔═══════════════════════════════════════════════════════════╗
-║          🎉 UTILITY DRIP DEPLOYMENT COMPLETE 🎉           ║
+║          🎉 UTILITY PROTOCOL DEPLOYMENT COMPLETE 🎉       ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Network:          testnet                                ║
 ║  Contract ID:      CB7PSJZALNWNX7NLOAM6LOEL4OJZMFPQZJMIYO522ZSACYWXTZIDEDSS
