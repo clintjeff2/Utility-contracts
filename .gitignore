@@ -6,6 +6,7 @@ target
 .soroban
 .stellar
 
+AGENTS.md
 .agent/
 agents/
 issue.md
