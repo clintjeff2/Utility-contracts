@@ -3,7 +3,7 @@ use soroban_sdk::{
     BytesN, Env, Symbol, Vec,
 };
 
-use crate::{ContinuousFlow, ContractError, DataKey, StreamStatus};
+use crate::{ContinuousFlow, ContractError, DataKey, StreamStatus, check_budget, validate_page_size, estimate_iteration_budget, MAX_PAGE_SIZE};
 
 /// Issue #262: Ledger Rent Sweeper for Depleted "Ghost" Devices
 /// Prunes abandoned streams after 90 days to reduce ledger footprint
@@ -205,7 +205,17 @@ impl GhostSweeper {
         let mut total_bytes_reclaimed = 0u64;
         let mut total_gas_bounty = 0i128;
 
-        for stream_id in stream_ids.iter() {
+        let num_items = stream_ids.len() as u32;
+        // Validate page size
+        let validated_limit = validate_page_size(num_items).unwrap();
+        // Check budget before starting
+        check_budget(&env, estimate_iteration_budget(validated_limit)).unwrap();
+
+        for (i, stream_id) in stream_ids.iter().enumerate() {
+            // Check budget periodically
+            if i % 10 == 0 {
+                check_budget(&env, estimate_iteration_budget(10)).unwrap();
+            }
             let bounty = Self::prune_ghost_stream(env.clone(), stream_id, relayer.clone());
             streams_pruned += 1;
             total_gas_bounty += bounty;
@@ -241,11 +251,21 @@ impl GhostSweeper {
         let mut candidates = Vec::new(&env);
         let current_time = env.ledger().timestamp();
 
+        // Validate and cap limit
+        let validated_limit = validate_page_size(limit).unwrap();
+
+        // Check budget before starting
+        check_budget(&env, estimate_iteration_budget(validated_limit)).unwrap();
+
         // This is a simplified implementation
         // In production, you would iterate through all streams or use an index
-        let stream_ids = Self::get_all_stream_ids(&env, limit);
+        let stream_ids = Self::get_all_stream_ids(&env, validated_limit);
 
-        for stream_id in stream_ids.iter() {
+        for (i, stream_id) in stream_ids.iter().enumerate() {
+            // Check budget periodically
+            if i % 10 == 0 {
+                check_budget(&env, estimate_iteration_budget(10)).unwrap();
+            }
             let stream_key = DataKey::ContinuousFlow(stream_id);
             if let Some(stream) = env
                 .storage()

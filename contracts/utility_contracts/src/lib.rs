@@ -1171,6 +1171,12 @@ pub enum ContractError {
     UpgradeProposalExpired = 106,
     NotAuthorizedUpgradeSigner = 107,
     InsufficientUpgradeApprovals = 108,
+    // Budget and paging errors
+    BudgetExceeded = 109,
+    PageSizeExceeded = 110,
+    // Flow rate validation errors
+    FlowRateTooLow = 111,
+    FlowRateTooHigh = 112,
 }
 
 #[contracttype]
@@ -1273,6 +1279,16 @@ const ED25519_SIGNATURE_SIZE: usize = 64;
 const SHA256_HASH_SIZE: usize = 32;
 const MAX_BYTE_ARRAY_SIZE: usize = 1024; // Maximum reasonable size for user inputs
 
+// Budget and paging constants
+pub(crate) const MAX_CONTRACT_INSTRUCTIONS: u64 = 1_000_000; // 1M instructions per contract call
+pub(crate) const MIN_REMAINING: u64 = 100_000; // Minimum remaining instructions before stopping
+pub(crate) const MAX_PAGE_SIZE: u32 = 100; // Maximum number of items per page
+pub(crate) const DEFAULT_PAGE_SIZE: u32 = 20; // Default page size
+pub(crate) const BUDGET_CHECK_COST: u64 = 500; // Cost of a single budget check
+pub(crate) const STORAGE_READ_COST: u64 = 5_000; // Cost of a single storage read
+pub(crate) const STORAGE_WRITE_COST: u64 = 5_000; // Cost of a single storage write
+pub(crate) const CONTRACT_INVOCATION_COST: u64 = 10_000; // Cost of a contract invocation
+
 /// Validate Ed25519 public key byte array
 /// Ensures correct length and non-zero values
 fn validate_ed25519_public_key(public_key: &BytesN<32>) -> Result<(), ContractError> {
@@ -1351,6 +1367,32 @@ fn validate_hourly_flow_rate(hourly_rate: i128) -> Result<(), ContractError> {
     }
 
     Ok(())
+}
+
+/// Check if remaining budget is sufficient for required instructions
+pub(crate) fn check_budget(env: &Env, required: u64) -> Result<(), ContractError> {
+    let remaining = env.budget().get_remaining_instructions();
+    if remaining < required {
+        return Err(ContractError::BudgetExceeded);
+    }
+    Ok(())
+}
+
+/// Validate page size is within allowed limits
+pub(crate) fn validate_page_size(page_size: u32) -> Result<u32, ContractError> {
+    if page_size == 0 {
+        Ok(DEFAULT_PAGE_SIZE)
+    } else if page_size > MAX_PAGE_SIZE {
+        Err(ContractError::PageSizeExceeded)
+    } else {
+        Ok(page_size)
+    }
+}
+
+/// Estimate required budget for iterating over N storage items
+pub(crate) fn estimate_iteration_budget(num_items: u32) -> u64 {
+    // Budget = (storage read cost per item * num items) + (budget check cost per item * num items)
+    (STORAGE_READ_COST * num_items as u64) + (BUDGET_CHECK_COST * num_items as u64)
 }
 
 fn get_meter_or_panic(env: &Env, meter_id: u64) -> Meter {
