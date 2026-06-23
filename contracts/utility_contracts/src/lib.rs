@@ -440,6 +440,23 @@ pub struct ClaimSettlement {
 
 #[contracttype]
 #[derive(Clone)]
+pub struct DeliveryFailure {
+    pub batch_id: BytesN<32>,
+    pub user: Address,
+    pub amount: i128,
+    pub reason: String,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct PendingSettlement {
+    pub amount: i128,
+    pub token: Address,
+    pub expires_at: u64,
+}
+
+#[contracttype]
+#[derive(Clone)]
 pub struct ResellerConfig {
     pub reseller: Address,
     pub fee_bps: i128,
@@ -1066,6 +1083,8 @@ pub enum DataKey {
     ActiveUpgradeProposalId,
     // Meter reading validation
     LastReadingTime(u64),
+    // Pending settlement
+    PendingSettlement(Address, BytesN<32>),
 }
 
 #[contracterror(export = false)]
@@ -1322,6 +1341,10 @@ const MAX_GAS_DELTA: i128 = 50 * 1_000_000_00; // 50 m³ per 5-min interval
 const MAX_WATER_DELTA: i128 = 200 * 1_000_000_00; // 200 L per 5-min interval
 const MAX_HEAT_DELTA: i128 = 100 * 1_000_000_00; // 100 units per 5-min interval
 
+// Pending settlement constants
+const PENDING_CLAIM_TTL: u64 = 30 * 86400; // 30 days
+const MAX_PENDING: usize = 10; // Max pending failures per batch
+
 /// Validate Ed25519 public key byte array
 /// Ensures correct length and non-zero values
 fn validate_ed25519_public_key(public_key: &BytesN<32>) -> Result<(), ContractError> {
@@ -1482,6 +1505,68 @@ fn validate_reading(
     }
 
     Ok(())
+}
+
+/// Check if a trustline is open for a token and user
+/// Attempts to get the user's balance - if it fails, trustline is closed
+fn is_trustline_open(env: &Env, token: &Address, user: &Address) -> bool {
+    let client = token::Client::new(env, token);
+    // Try to get balance - if it panics (trustline closed), return false
+    let result = soroban_sdk::Env::try_invoke_contract::<_, i128>(
+        env,
+        token,
+        &soroban_sdk::symbol_short!("balance"),
+        (user,),
+    );
+    result.is_ok()
+}
+
+/// Store a pending settlement for later claim
+fn store_pending_settlement(
+    env: &Env,
+    user: &Address,
+    batch_id: BytesN<32>,
+    amount: i128,
+    token: &Address,
+) {
+    let now = env.ledger().timestamp();
+    let pending = PendingSettlement {
+        amount,
+        token: token.clone(),
+        expires_at: now + PENDING_CLAIM_TTL,
+    };
+    env.storage()
+        .instance()
+        .set(&DataKey::PendingSettlement(user.clone(), batch_id), &pending);
+}
+
+/// Try to transfer tokens; if trustline is closed, store pending
+fn try_transfer_or_store_pending(
+    env: &Env,
+    token: &Address,
+    from: &Address,
+    to: &Address,
+    amount: i128,
+    batch_id: BytesN<32>,
+) -> bool {
+    if is_trustline_open(env, token, to) {
+        transfer_tokens(env, token, from, to, &amount);
+        true
+    } else {
+        let reason = String::from_str(env, "Trustline closed");
+        let event = DeliveryFailure {
+            batch_id: batch_id.clone(),
+            user: to.clone(),
+            amount,
+            reason,
+        };
+        env.events().publish(
+            (soroban_sdk::symbol_short!("DeliveryFail"), to.clone(), batch_id),
+            event,
+        );
+        store_pending_settlement(env, to, batch_id, amount, token);
+        false
+    }
 }
 
 fn get_meter_or_panic(env: &Env, meter_id: u64) -> Meter {
@@ -8318,6 +8403,48 @@ fn attempt_partial_routing(env: &Env, amount: i128) -> Result<i128, ContractErro
 }
 
 impl UtilityContract {
+    // --- Claim pending settlement ---
+    pub fn claim_pending(env: Env, user: Address, batch_id: BytesN<32>) {
+        user.require_auth();
+
+        let now = env.ledger().timestamp();
+        let key = DataKey::PendingSettlement(user.clone(), batch_id);
+        let pending: Option<PendingSettlement> = env.storage().instance().get(&key);
+
+        match pending {
+            None => {
+                // No pending settlement, do nothing
+            },
+            Some(p) => {
+                if now > p.expires_at {
+                    // Expired: forfeit to protocol treasury
+                    if let Some(treasury) = env
+                        .storage()
+                        .instance()
+                        .get::<_, Address>(&DataKey::MaintenanceWallet)
+                    {
+                        transfer_tokens(&env, &p.token, &env.current_contract_address(), &treasury, &p.amount);
+                    }
+                    // Remove expired pending
+                    env.storage().instance().remove(&key);
+                } else {
+                    // Check if trustline is now open
+                    if is_trustline_open(&env, &p.token, &user) {
+                        transfer_tokens(&env, &p.token, &env.current_contract_address(), &user, &p.amount);
+                        env.storage().instance().remove(&key);
+                    } else {
+                        // Still closed, update expiry
+                        let new_pending = PendingSettlement {
+                            expires_at: now + PENDING_CLAIM_TTL,
+                            ..p
+                        };
+                        env.storage().instance().set(&key, &new_pending);
+                    }
+                }
+            }
+        }
+    }
+
     // --- Issues #248–#251 (enterprise) thin entrypoints ---
     pub fn set_provider_fleet_cap(env: Env, provider: Address, new_cap: i128, authority: Address) {
         crate::enterprise::set_fleet_cap_super_admin(&env, provider, new_cap, authority);
