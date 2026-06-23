@@ -196,12 +196,15 @@ impl SecureCallManager {
             .set(&SecureCallDataKey::CallDepth, &current_depth);
 
         match call_result {
-            Ok(result) => Ok(CallResult {
-                success: true,
-                data: result,
-                gas_used: effective_gas_limit,
-                error_code: None,
-            }),
+            Ok(result) => {
+                if result.is_void() { return Err(SecureCallError::InvalidReturnValue); }
+                Ok(CallResult {
+                    success: true,
+                    data: result,
+                    gas_used: effective_gas_limit,
+                    error_code: None,
+                })
+            }
             Err(_) => Err(SecureCallError::ContractCallFailed),
         }
     }
