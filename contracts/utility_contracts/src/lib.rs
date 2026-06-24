@@ -1066,6 +1066,9 @@ pub enum DataKey {
     ActiveUpgradeProposalId,
     // Meter reading validation
     LastReadingTime(u64),
+    // Storage Versioning
+    StorageVersion,
+    MigrationCursor,
 }
 
 #[contracterror(export = false)]
@@ -1202,6 +1205,12 @@ pub enum ContractError {
     InvalidReadingValue = 113,
     DuplicateTimestamp = 114,
     ReadingDeltaTooLarge = 115,
+    // Storage Versioning errors
+    StorageVersionMismatch = 116,
+    IncompatibleStorageVersion = 117,
+    MigrationInProgress = 118,
+    MigrationFailed = 119,
+    NoMigrationFunction = 120,
 }
 
 #[contracttype]
@@ -1272,6 +1281,14 @@ const AUTO_EXTEND_LEDGER_THRESHOLD: u32 = 100;
 const LEDGER_LIFETIME_EXTENSION: u32 = 10_000;
 const UPGRADE_VETO_PERIOD_SECONDS: u64 = 7 * DAY_IN_SECONDS;
 const VETO_THRESHOLD_BPS: i128 = 500;
+
+
+const MIGRATION_INSTRUCTION_BUDGET: u64 = 5_000_000;
+const INITIAL_STORAGE_VERSION: u32 = 1;
+const CURRENT_STORAGE_VERSION: u32 = 1;
+const MAX_VERSION_DELTA: u32 = 1;
+const MIGRATION_INSTRUCTION_BUDGET: u64 = 5_000_000; // 5M instructions per migration call
+
 
 // Issue #277: Emergency Drain Recovery Constants
 const EMERGENCY_DRAIN_COOLDOWN_SECONDS: u64 = 24 * HOUR_IN_SECONDS; // 24 hour cooldown
@@ -2238,6 +2255,120 @@ fn can_finalize_upgrade(env: &Env) -> bool {
     veto_bps < VETO_THRESHOLD_BPS
 }
 
+// ============================================================
+// Storage Versioning Helper Functions
+// ============================================================
+
+/// Get the current storage version from storage
+fn get_storage_version(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DataKey::StorageVersion)
+        .unwrap_or(INITIAL_STORAGE_VERSION)
+}
+
+/// Set the storage version in storage
+fn set_storage_version(env: &Env, version: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::StorageVersion, &version);
+    
+    env.events().publish(
+        (soroban_sdk::symbol_short!("StrVer"),),
+        version,
+    );
+}
+
+/// Check if migration is in progress
+fn is_migration_in_progress(env: &Env) -> bool {
+    env.storage()
+        .instance()
+        .get::<_, u64>(&DataKey::MigrationCursor)
+        .is_some()
+}
+
+/// Clear migration cursor
+fn clear_migration_cursor(env: &Env) {
+    env.storage()
+        .instance()
+        .remove(&DataKey::MigrationCursor);
+}
+
+/// Validate storage version compatibility before upgrade
+fn validate_storage_version_compatibility(env: &Env, new_version: u32) -> Result<(), ContractError> {
+    let current_version = get_storage_version(env);
+    
+    // Check if versions are compatible
+    if new_version == current_version {
+        // Same version, no migration needed
+        return Ok(());
+    }
+    
+    // Check if version delta is within acceptable range
+    let version_delta = if new_version > current_version {
+        new_version - current_version
+    } else {
+        // Downgrade not allowed
+        return Err(ContractError::IncompatibleStorageVersion);
+    };
+    
+    if version_delta > MAX_VERSION_DELTA {
+        return Err(ContractError::IncompatibleStorageVersion);
+    }
+    
+    // Check if migration is already in progress
+    if is_migration_in_progress(env) {
+        return Err(ContractError::MigrationInProgress);
+    }
+    
+    Ok(())
+}
+
+/// Sample migration function from v1 to v2
+/// This is a placeholder that demonstrates the migration pattern
+/// Real migrations would read old keys and write to new keys
+fn migrate_v1_to_v2(env: &Env) -> Result<bool, ContractError> {
+    // Get migration cursor or start from 0
+    let cursor: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::MigrationCursor)
+        .unwrap_or(0);
+    
+    // Example: Migrate meter data in batches
+    // This is a placeholder - actual implementation would migrate real data
+    let batch_size: u64 = 10;
+    let max_meters: u64 = env.storage().instance().get(&DataKey::Count).unwrap_or(0);
+    
+    if cursor >= max_meters {
+        // Migration complete
+        clear_migration_cursor(env);
+        set_storage_version(env, 2);
+        
+        env.events().publish(
+            (soroban_sdk::symbol_short!("MigDone"),),
+            2u32,
+        );
+        
+        return Ok(true); // Migration complete
+    }
+    
+    // Migrate a batch of meters (demo - no actual data transformation)
+    let next_cursor = core::cmp::min(cursor + batch_size, max_meters);
+    
+    // Store the new cursor for next iteration
+    env.storage()
+        .instance()
+        .set(&DataKey::MigrationCursor, &next_cursor);
+    
+    env.events().publish(
+        (soroban_sdk::symbol_short!("MigBatch"),),
+        (cursor, next_cursor),
+    );
+    
+    Ok(false) // Migration not complete, needs more calls
+}
+
 #[contract]
 pub struct UtilityContract;
 
@@ -3113,6 +3244,11 @@ impl UtilityContract {
         env.storage()
             .instance()
             .set(&DataKey::AdminAddress, &admin_address);
+        
+        // Initialize storage version if not already set
+        if !env.storage().instance().has(&DataKey::StorageVersion) {
+            set_storage_version(&env, INITIAL_STORAGE_VERSION);
+        }
     }
 
     /// Adds funds to the gas bounty pool used to reward dust sweepers.
@@ -6435,6 +6571,120 @@ impl UtilityContract {
             .instance()
             .remove(&DataKey::UpgradeProposalTime);
         env.storage().instance().remove(&DataKey::VetoDeadline);
+    }
+
+    // ============================================================
+    // Storage Versioning Public Functions
+    // ============================================================
+
+    /// Get the current storage version
+    pub fn get_storage_version_public(env: Env) -> u32 {
+        get_storage_version(&env)
+    }
+
+    /// Finalize upgrade with storage version checking
+    /// This is the enhanced version that validates storage compatibility
+    pub fn finalize_upgrade_v2(env: Env, new_storage_version: u32) {
+        // Check if upgrade can be finalized
+        if !can_finalize_upgrade(&env) {
+            panic_with_error!(&env, ContractError::UpgradeProposalActive);
+        }
+
+        // Get the proposed upgrade
+        let proposal: UpgradeProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::ProposedUpgrade)
+            .expect("No upgrade proposal found");
+
+        // Validate storage version compatibility
+        if let Err(e) = validate_storage_version_compatibility(&env, new_storage_version) {
+            panic_with_error!(&env, e);
+        }
+
+        // Execute the WASM upgrade on-chain
+        env.deployer()
+            .update_current_contract_wasm(proposal.new_wasm_hash.clone());
+
+        env.events().publish(
+            (soroban_sdk::symbol_short!("UpgrdFin"),),
+            proposal.new_wasm_hash,
+        );
+
+        // Check if migration is needed
+        let current_version = get_storage_version(&env);
+        if new_storage_version > current_version {
+            // Version increased by 1, migration needed
+            env.events().publish(
+                (soroban_sdk::symbol_short!("MigStart"),),
+                (current_version, new_storage_version),
+            );
+            
+            // Note: Actual migration should be called separately via run_migration
+            // to allow for batched/resumable execution
+        } else {
+            // Same version, update directly
+            set_storage_version(&env, new_storage_version);
+        }
+
+        // Clear the proposal
+        env.storage().instance().remove(&DataKey::ProposedUpgrade);
+        env.storage()
+            .instance()
+            .remove(&DataKey::UpgradeProposalTime);
+        env.storage().instance().remove(&DataKey::VetoDeadline);
+    }
+
+    /// Run migration for storage version upgrade
+    /// This function can be called multiple times to complete a migration in batches
+    /// Returns true if migration is complete, false if more calls are needed
+    pub fn run_migration(env: Env, target_version: u32) -> bool {
+        require_admin_auth(&env);
+
+        let current_version = get_storage_version(&env);
+
+        // Check if migration is needed
+        if target_version == current_version {
+            // Already at target version
+            return true;
+        }
+
+        if target_version < current_version {
+            panic_with_error!(&env, ContractError::IncompatibleStorageVersion);
+        }
+
+        // Currently only support v1 to v2 migration
+        if current_version == 1 && target_version == 2 {
+            match migrate_v1_to_v2(&env) {
+                Ok(complete) => complete,
+                Err(e) => panic_with_error!(&env, e),
+            }
+        } else {
+            // No migration function available for this version pair
+            panic_with_error!(&env, ContractError::NoMigrationFunction);
+        }
+    }
+
+    /// Cancel an ongoing migration (admin only)
+    /// This is useful if a migration encounters issues and needs to be reset
+    pub fn cancel_migration(env: Env) {
+        require_admin_auth(&env);
+
+        if !is_migration_in_progress(&env) {
+            return; // Nothing to cancel
+        }
+
+        clear_migration_cursor(&env);
+
+        env.events().publish(
+            (soroban_sdk::symbol_short!("MigCancel"),),
+            get_storage_version(&env),
+        );
+    }
+
+    /// Check if a migration is currently in progress
+    pub fn is_migration_active(env: Env) -> bool {
+        is_migration_in_progress(&env)
     }
 
     // ============================================================
