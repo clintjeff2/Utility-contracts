@@ -2,6 +2,7 @@
 extern crate alloc;
 
 pub mod namespace;
+pub mod scaling;
 pub mod weighted_rate;
 
 #[cfg(test)]
