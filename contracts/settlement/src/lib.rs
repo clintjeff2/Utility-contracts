@@ -9,7 +9,10 @@ mod storage;
 mod token_utils;
 mod types;
 
-use soroban_sdk::{contract, contractclient, contracterror, contractimpl, panic_with_error, Address, Env};
+use soroban_sdk::{
+    contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error, Address,
+    Env,
+};
 
 #[cfg(test)]
 mod test;
@@ -17,14 +20,33 @@ mod test;
 use crate::constants::MAX_FEE_RATE_BPS;
 use crate::conversion::convert_to_settlement_currency;
 use crate::fees::compute_fee;
+use crate::rate_application::resolve_rate;
 use crate::reentrancy::ReentrancyGuard;
 use crate::token_utils::collect_fee;
 use crate::types::{SettlementArgs, SettlementResult};
 
+/// Oracle price snapshot. Layout mirrors the `price_oracle` contract's
+/// `PriceData` (field names/types match) so it deserializes from that oracle's
+/// `get_price()` response across the cross-contract boundary.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OraclePrice {
+    /// Price in 7-decimal fixed point.
+    pub price: i128,
+    /// Number of decimal places the price is expressed in.
+    pub decimals: u32,
+    /// Ledger timestamp (epoch-seconds) at which the price was last updated.
+    pub last_updated: u64,
+}
+
 /// Cross-contract interface for the PriceOracle.
 #[contractclient(name = "PriceOracleClient")]
 pub trait PriceOracle {
+    /// Raw price value (7-decimal fixed point).
     fn get_price_value(env: Env) -> i128;
+    /// Full price snapshot including the `last_updated` timestamp used for
+    /// staleness checks.
+    fn get_price(env: Env) -> OraclePrice;
 }
 
 #[contracterror]
@@ -36,6 +58,8 @@ pub enum SettlementError {
     SlippageExceeded = 3,
     /// A cross-contract callback attempted to re-enter a guarded entry point.
     ReentrantCall = 4,
+    /// The oracle price is older than `MAX_ORACLE_AGE` (stale feed).
+    OracleStale = 5,
 }
 
 #[contract]
@@ -137,14 +161,15 @@ impl SettlementContract {
 
         payer.require_auth();
 
-        let rate = {
-            let oracle_client = PriceOracleClient::new(&env, &oracle);
-            oracle_client.get_price_value()
-        };
+        // Resolve the exchange rate with staleness protection: a fresh oracle
+        // price is used directly; a stale feed is rejected and replaced by the
+        // conservative FALLBACK_RATE (emitting a StaleFbk event). `rate` is the
+        // rate actually applied, reported back as `rate_used`.
+        let rate = resolve_rate(&env, &oracle);
 
         let settlement_amount = convert_to_settlement_currency(
             &env,
-            &oracle,
+            rate,
             args.volume,
             args.min_expected_amount,
         );

@@ -167,8 +167,10 @@ fn test_randomized_properties() {
     }
 }
 
-use soroban_sdk::testutils::Address as _;
+use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+
+use crate::constants::{DECIMAL_DENOMINATOR, FALLBACK_RATE, MAX_ORACLE_AGE};
 
 /// A malicious token whose `transfer` re-enters the settlement contract,
 /// modelling the cross-contract reentrancy attack from issue #8.
@@ -206,14 +208,14 @@ impl MaliciousToken {
     }
 }
 
-use crate::constants::DECIMAL_DENOMINATOR;
 use crate::types::SettlementArgs;
-use crate::{SettlementContract, SettlementContractClient};
+use crate::{OraclePrice, SettlementContract, SettlementContractClient};
 
 #[contracttype]
 #[derive(Clone)]
 enum OracleDataKey {
     Price,
+    Updated,
 }
 
 #[contract]
@@ -223,6 +225,8 @@ struct MockOracle;
 impl MockOracle {
     pub fn initialize(env: Env, _admin: Address, _updater: Address, initial_price: i128, _decimals: u32) {
         env.storage().instance().set(&OracleDataKey::Price, &initial_price);
+        let now = env.ledger().timestamp();
+        env.storage().instance().set(&OracleDataKey::Updated, &now);
     }
 
     pub fn get_price_value(env: Env) -> i128 {
@@ -230,6 +234,21 @@ impl MockOracle {
             .instance()
             .get(&OracleDataKey::Price)
             .unwrap_or(0)
+    }
+
+    /// Full snapshot consumed by the settlement staleness check.
+    pub fn get_price(env: Env) -> OraclePrice {
+        OraclePrice {
+            price: env.storage().instance().get(&OracleDataKey::Price).unwrap_or(0),
+            decimals: 7,
+            last_updated: env.storage().instance().get(&OracleDataKey::Updated).unwrap_or(0),
+        }
+    }
+
+    /// Test helper: override the price's last-updated timestamp to simulate a
+    /// stale (or freshly-updated) feed.
+    pub fn set_updated(env: Env, ts: u64) {
+        env.storage().instance().set(&OracleDataKey::Updated, &ts);
     }
 }
 
@@ -387,6 +406,50 @@ fn test_user_min_expected_amount_higher_than_actual_fails() {
     assert!(result.is_err());
 }
 
+// --- Oracle staleness protection (issue #7) ------------------------------
+
+/// Pure unit tests for the staleness predicate and rate application.
+mod staleness_unit {
+    use crate::constants::{
+        DECIMAL_DENOMINATOR, FALLBACK_RATE, MAX_ORACLE_AGE, MAX_ORACLE_AGE_BOUND,
+        MIN_ORACLE_AGE_BOUND,
+    };
+    use crate::rate_application::{apply_rate_to_volume, compute_fallback_rate, is_stale};
+
+    #[test]
+    fn test_max_oracle_age_within_bounds() {
+        assert!(MAX_ORACLE_AGE >= MIN_ORACLE_AGE_BOUND);
+        assert!(MAX_ORACLE_AGE <= MAX_ORACLE_AGE_BOUND);
+    }
+
+    #[test]
+    fn test_is_stale_boundary() {
+        let updated = 1_000u64;
+        // age == MAX_ORACLE_AGE -> still fresh.
+        assert!(!is_stale(updated + MAX_ORACLE_AGE, updated));
+        // age == MAX_ORACLE_AGE + 1 -> stale.
+        assert!(is_stale(updated + MAX_ORACLE_AGE + 1, updated));
+        // clock skew (updated in the future) -> treated as fresh, no underflow.
+        assert!(!is_stale(updated, updated + 50));
+    }
+
+    #[test]
+    fn test_apply_rate_to_volume() {
+        // volume * rate / 1e7
+        assert_eq!(apply_rate_to_volume(1_000_0000, FALLBACK_RATE), 5_000_000);
+        assert_eq!(apply_rate_to_volume(0, FALLBACK_RATE), 0);
+        assert_eq!(
+            apply_rate_to_volume(DECIMAL_DENOMINATOR, DECIMAL_DENOMINATOR),
+            DECIMAL_DENOMINATOR
+        );
+    }
+
+    #[test]
+    fn test_compute_fallback_rate() {
+        assert_eq!(compute_fallback_rate(), FALLBACK_RATE);
+    }
+}
+
 #[test]
 fn test_settle_normal_flow_with_guard() {
     // The reentrancy guard must not break a legitimate single (non-reentrant) call.
@@ -450,4 +513,102 @@ fn test_reentrancy_attack_via_finalize_is_blocked() {
     }));
 
     assert!(result.is_err(), "reentrant finalize_settlement must be rejected");
+}
+
+#[test]
+fn test_fresh_oracle_under_threshold_uses_oracle_rate() {
+    // Fresh feed (age 0) -> the oracle price is used directly.
+    let (env, oracle_id, _admin, payer, payee, fee_collector) = setup_env();
+    let settlement_id = setup_settlement(&env);
+    let settlement_client = SettlementContractClient::new(&env, &settlement_id);
+
+    let rate = 100_000_0000i128;
+    let volume = 1_000_0000i128;
+    let token_id = setup_token(&env, &payer, settlement_amount(volume, rate));
+
+    let args = make_args(token_id, volume, payee.clone(), None);
+
+    let result =
+        settlement_client.finalize_settlement(&oracle_id, &payer, &fee_collector, &args, &100u32);
+
+    assert_eq!(result.rate_used, rate);
+    assert!(result.net_amount > 0);
+}
+
+#[test]
+fn test_fresh_oracle_at_boundary_uses_oracle_rate() {
+    // Age exactly MAX_ORACLE_AGE -> still fresh -> oracle price used.
+    let (env, oracle_id, _admin, payer, payee, fee_collector) = setup_env();
+    let settlement_id = setup_settlement(&env);
+    let settlement_client = SettlementContractClient::new(&env, &settlement_id);
+    let oracle_client = MockOracleClient::new(&env, &oracle_id);
+
+    let rate = 100_000_0000i128;
+    let volume = 1_000_0000i128;
+    let token_id = setup_token(&env, &payer, settlement_amount(volume, rate));
+
+    // Price stamped at t=0; advance the ledger to exactly MAX_ORACLE_AGE.
+    oracle_client.set_updated(&0u64);
+    env.ledger().set_timestamp(MAX_ORACLE_AGE);
+
+    let args = make_args(token_id, volume, payee.clone(), None);
+    let result =
+        settlement_client.finalize_settlement(&oracle_id, &payer, &fee_collector, &args, &100u32);
+
+    assert_eq!(result.rate_used, rate, "boundary age must be treated as fresh");
+}
+
+#[test]
+fn test_stale_oracle_falls_back_to_conservative_rate() {
+    // Feed older than MAX_ORACLE_AGE -> stale price rejected, FALLBACK_RATE used.
+    let (env, oracle_id, _admin, payer, payee, fee_collector) = setup_env();
+    let settlement_id = setup_settlement(&env);
+    let settlement_client = SettlementContractClient::new(&env, &settlement_id);
+    let oracle_client = MockOracleClient::new(&env, &oracle_id);
+
+    let volume = 1_000_0000i128;
+    // Fund generously: settlement uses the (smaller) fallback rate.
+    let token_id = setup_token(&env, &payer, 1_000_000_000i128);
+
+    // Price stamped at t=0; push the clock one second past the staleness window.
+    oracle_client.set_updated(&0u64);
+    env.ledger().set_timestamp(MAX_ORACLE_AGE + 1);
+
+    let args = make_args(token_id, volume, payee.clone(), None);
+    let result =
+        settlement_client.finalize_settlement(&oracle_id, &payer, &fee_collector, &args, &100u32);
+
+    assert_eq!(
+        result.rate_used, FALLBACK_RATE,
+        "stale oracle must fall back to the conservative rate"
+    );
+    // Settlement amount reflects the fallback rate, not the stale oracle price.
+    let expected_settlement = volume * FALLBACK_RATE / DECIMAL_DENOMINATOR;
+    let expected_fee = crate::fees::compute_fee(expected_settlement, 100);
+    assert_eq!(result.fee_amount, expected_fee);
+    assert_eq!(result.net_amount, expected_settlement - expected_fee);
+}
+
+#[test]
+fn test_get_fresh_rate_rejects_stale_feed() {
+    // The strict, Result-returning variant (issue #7 step 7): Ok when fresh,
+    // Err(OracleStale) when stale — no fallback.
+    let (env, oracle_id, _admin, _payer, _payee, _fee_collector) = setup_env();
+    let settlement_id = setup_settlement(&env);
+    let oracle_client = MockOracleClient::new(&env, &oracle_id);
+    oracle_client.set_updated(&0u64);
+
+    // Fresh.
+    env.ledger().set_timestamp(MAX_ORACLE_AGE);
+    let fresh = env.as_contract(&settlement_id, || {
+        crate::rate_application::get_fresh_rate(&env, &oracle_id)
+    });
+    assert_eq!(fresh, Ok(100_000_0000i128));
+
+    // Stale.
+    env.ledger().set_timestamp(MAX_ORACLE_AGE + 1);
+    let stale = env.as_contract(&settlement_id, || {
+        crate::rate_application::get_fresh_rate(&env, &oracle_id)
+    });
+    assert_eq!(stale, Err(crate::SettlementError::OracleStale));
 }

@@ -1,34 +1,32 @@
-use soroban_sdk::{panic_with_error, Address, Env};
+use soroban_sdk::{panic_with_error, Env};
 
-use crate::constants::{BPS_DENOMINATOR, DECIMAL_DENOMINATOR, MAX_SLIPPAGE_BPS};
-use crate::rate_application::get_rate;
+use crate::constants::{BPS_DENOMINATOR, MAX_SLIPPAGE_BPS};
+use crate::rate_application::apply_rate_to_volume;
 use crate::SettlementError;
 
-/// Convert resource token volume to settlement currency using the oracle exchange rate.
+/// Convert resource token volume to settlement currency using the supplied
+/// (already staleness-resolved) exchange rate.
+///
+/// The `rate` is resolved by the caller via
+/// [`crate::rate_application::resolve_rate`], so a stale oracle has already been
+/// replaced by the conservative fallback before reaching this function.
 ///
 /// Flow:
-/// 1. Fetches the current oracle rate
-/// 2. Computes the settlement amount = volume * rate / 1e7
-/// 3. Checks actual amount against slippage tolerance and user's minimum
+/// 1. Computes the settlement amount = volume * rate / 1e7
+/// 2. Checks actual amount against slippage tolerance and user's minimum
 ///
 /// # Returns
-/// The settlement amount computed from the oracle rate
+/// The settlement amount computed from the resolved rate
 ///
 /// # Panics
 /// * `SlippageExceeded` if slippage exceeds MAX_SLIPPAGE_BPS or actual < min_expected_amount
 pub fn convert_to_settlement_currency(
     env: &Env,
-    oracle: &Address,
+    rate: i128,
     volume: i128,
     min_expected_amount: Option<i128>,
 ) -> i128 {
-    let rate = get_rate(env, oracle);
-
-    let expected_amount = volume
-        .checked_mul(rate)
-        .expect("conversion overflow")
-        .checked_div(DECIMAL_DENOMINATOR)
-        .expect("conversion underflow");
+    let expected_amount = apply_rate_to_volume(volume, rate);
 
     let actual_amount = expected_amount;
 
